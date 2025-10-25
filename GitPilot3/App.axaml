@@ -1,0 +1,348 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="GitPilot3.App"
+             RequestedThemeVariant="Dark">
+
+    <Application.Styles>
+        <FluentTheme />
+        
+        <!-- GitPilot3 Design System with Inline Colors and Styles -->
+        
+        <!-- Primary Button Styles -->
+        <Style Selector="Button.Primary">
+            <Setter Property="Background" Value="#2196F3" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderBrush" Value="#1976D2" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="Margin" Value="2" />
+            <Setter Property="FontWeight" Value="Medium" />
+        </Style>
+        
+        <Style Selector="Button.Primary:pointerover">
+            <Setter Property="Background" Value="#64B5F6" />
+        </Style>
+        
+        <Style Selector="Button.Primary:pressed">
+            <Setter Property="Background" Value="#1976D2" />
+        </Style>
+        
+        <!-- Secondary Button Styles -->
+        <Style Selector="Button.Secondary">
+            <Setter Property="Background" Value="#2D2D2D" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderBrush" Value="#404040" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="Margin" Value="2" />
+        </Style>
+        
+        <Style Selector="Button.Secondary:pointerover">
+            <Setter Property="Background" Value="#404040" />
+        </Style>
+        
+        <!-- Toolbar Button Styles -->
+        <Style Selector="Button.Toolbar">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="Margin" Value="1" />
+            <Setter Property="CornerRadius" Value="3" />
+        </Style>
+        
+        <Style Selector="Button.Toolbar:pointerover">
+            <Setter Property="Background" Value="#404040" />
+        </Style>
+        
+        <!-- Success/Warning Button Styles -->
+        <Style Selector="Button.Success">
+            <Setter Property="Background" Value="#4CAF50" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderBrush" Value="#388E3C" />
+        </Style>
+        
+        <Style Selector="Button.Warning">
+            <Setter Property="Background" Value="#FF9800" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderBrush" Value="#F57C00" />
+        </Style>
+        
+        <Style Selector="Button.Small">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="MinHeight" Value="24" />
+        </Style>
+        
+        <!-- Panel Styles -->
+        <Style Selector="Border.Header">
+            <Setter Property="Background" Value="#2D2D2D" />
+            <Setter Property="BorderBrush" Value="#404040" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="Padding" Value="16,12" />
+        </Style>
+        
+        <Style Selector="Border.Footer">
+            <Setter Property="Background" Value="#2D2D2D" />
+            <Setter Property="BorderBrush" Value="#404040" />
+            <Setter Property="BorderThickness" Value="0,1,0,0" />
+            <Setter Property="Padding" Value="16,8" />
+            <Setter Property="Height" Value="32" />
+        </Style>
+        
+        <Style Selector="Border.Toolbar">
+            <Setter Property="Background" Value="#3C3C3C" />
+            <Setter Property="BorderBrush" Value="#404040" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="Height" Value="40" />
+        </Style>
+        
+        <Style Selector="Border.Sidebar">
+            <Setter Property="Background" Value="#252525" />
+            <Setter Property="BorderBrush" Value="#404040" />
+        </Style>
+        
+        <Style Selector="Border.Content">
+            <Setter Property="Background" Value="#1E1E1E" />
+        </Style>
+        
+        <Style Selector="Border.Section">
+            <Setter Property="Background" Value="#2D2D2D" />
+            <Setter Property="BorderBrush" Value="#404040" />
+            <Setter Property="BorderThickness" Value="0,1,0,1" />
+            <Setter Property="Padding" Value="12,8" />
+        </Style>
+        
+        <Style Selector="Border.FileAdded">
+            <Setter Property="Background" Value="#0F2F0F" />
+            <Setter Property="BorderBrush" Value="#4CAF50" />
+            <Setter Property="BorderThickness" Value="2,0,0,0" />
+            <Setter Property="Padding" Value="8" />
+            <Setter Property="Margin" Value="2" />
+            <Setter Property="CornerRadius" Value="0,3,3,0" />
+        </Style>
+        
+        <Style Selector="Border.FileModified">
+            <Setter Property="Background" Value="#2F1F0F" />
+            <Setter Property="BorderBrush" Value="#FF9800" />
+            <Setter Property="BorderThickness" Value="2,0,0,0" />
+            <Setter Property="Padding" Value="8" />
+            <Setter Property="Margin" Value="2" />
+            <Setter Property="CornerRadius" Value="0,3,3,0" />
+        </Style>
+        
+        <!-- Typography Styles -->
+        <Style Selector="TextBlock.H4">
+            <Setter Property="FontSize" Value="18" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        
+        <Style Selector="TextBlock.H5">
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        
+        <Style Selector="TextBlock.H6">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        
+        <Style Selector="TextBlock.Body">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        
+        <Style Selector="TextBlock.Caption">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Foreground" Value="#A0A0A0" />
+        </Style>
+        
+        <Style Selector="TextBlock.Label">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="Foreground" Value="#E0E0E0" />
+        </Style>
+        
+        <Style Selector="TextBlock.CommitMessage">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        
+        <Style Selector="TextBlock.CommitHash">
+            <Setter Property="FontFamily" Value="Consolas, monospace" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Foreground" Value="#A0A0A0" />
+        </Style>
+        
+        <Style Selector="TextBlock.AuthorName">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="Foreground" Value="#E0E0E0" />
+        </Style>
+        
+        <Style Selector="TextBlock.Timestamp">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Foreground" Value="#A0A0A0" />
+        </Style>
+        
+        <Style Selector="TextBlock.FilePath">
+            <Setter Property="FontFamily" Value="Consolas, monospace" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="#E0E0E0" />
+        </Style>
+        
+        <Style Selector="TextBlock.CodeInline">
+            <Setter Property="FontFamily" Value="Consolas, monospace" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Background" Value="#2D2D2D" />
+            <Setter Property="Padding" Value="2,1" />
+        </Style>
+        
+        <Style Selector="TextBlock.FileIcon">
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        
+        <!-- Git Status Styles -->
+        <Style Selector="TextBlock.GitAdded">
+            <Setter Property="Foreground" Value="#4CAF50" />
+            <Setter Property="FontWeight" Value="Medium" />
+        </Style>
+        
+        <Style Selector="TextBlock.GitModified">
+            <Setter Property="Foreground" Value="#FF9800" />
+            <Setter Property="FontWeight" Value="Medium" />
+        </Style>
+        
+        <Style Selector="TextBlock.GitDeleted">
+            <Setter Property="Foreground" Value="#F44336" />
+            <Setter Property="FontWeight" Value="Medium" />
+        </Style>
+        
+        <Style Selector="TextBlock.SuccessText">
+            <Setter Property="Foreground" Value="#4CAF50" />
+            <Setter Property="FontWeight" Value="Medium" />
+        </Style>
+        
+        <Style Selector="TextBlock.WarningText">
+            <Setter Property="Foreground" Value="#FF9800" />
+            <Setter Property="FontWeight" Value="Medium" />
+        </Style>
+        
+        <Style Selector="TextBlock.BranchCurrent">
+            <Setter Property="Foreground" Value="#2196F3" />
+            <Setter Property="FontWeight" Value="Bold" />
+        </Style>
+        
+        <Style Selector="TextBlock.BranchName">
+            <Setter Property="Foreground" Value="#4CAF50" />
+            <Setter Property="FontWeight" Value="Medium" />
+        </Style>
+        
+        <Style Selector="TextBlock.SyncAhead">
+            <Setter Property="Foreground" Value="#4CAF50" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="FontFamily" Value="Consolas, monospace" />
+        </Style>
+        
+        <Style Selector="TextBlock.SyncBehind">
+            <Setter Property="Foreground" Value="#FF9800" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="FontFamily" Value="Consolas, monospace" />
+        </Style>
+        
+        <!-- Commit Graph Elements -->
+        <Style Selector="Ellipse.CommitNode">
+            <Setter Property="Width" Value="12" />
+            <Setter Property="Height" Value="12" />
+            <Setter Property="StrokeThickness" Value="2" />
+            <Setter Property="Stroke" Value="White" />
+        </Style>
+        
+        <Style Selector="Ellipse.CommitNodeCurrent">
+            <Setter Property="Fill" Value="#2196F3" />
+            <Setter Property="Stroke" Value="#2196F3" />
+            <Setter Property="Width" Value="14" />
+            <Setter Property="Height" Value="14" />
+            <Setter Property="StrokeThickness" Value="3" />
+        </Style>
+        
+        <Style Selector="Ellipse.CommitNodeLocal">
+            <Setter Property="Fill" Value="#4CAF50" />
+            <Setter Property="Stroke" Value="#4CAF50" />
+        </Style>
+        
+        <Style Selector="Ellipse.CommitNodeRemote">
+            <Setter Property="Fill" Value="#FF9800" />
+            <Setter Property="Stroke" Value="#FF9800" />
+        </Style>
+        
+        <Style Selector="Line.BranchLine">
+            <Setter Property="StrokeThickness" Value="2" />
+            <Setter Property="Stroke" Value="#606060" />
+        </Style>
+        
+        <Style Selector="Line.BranchLineCurrent">
+            <Setter Property="Stroke" Value="#2196F3" />
+            <Setter Property="StrokeThickness" Value="4" />
+        </Style>
+        
+        <Style Selector="Line.BranchLineLocal">
+            <Setter Property="Stroke" Value="#4CAF50" />
+            <Setter Property="StrokeThickness" Value="3" />
+        </Style>
+        
+        <Style Selector="Line.BranchLineRemote">
+            <Setter Property="Stroke" Value="#FF9800" />
+            <Setter Property="StrokeThickness" Value="2" />
+            <Setter Property="StrokeDashArray" Value="5,3" />
+        </Style>
+        
+        <!-- Global Base Styles -->
+        <Style Selector="Window">
+            <Setter Property="Background" Value="#1E1E1E" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        
+        <Style Selector="MenuItem">
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        
+        <Style Selector="TreeViewItem">
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Padding" Value="4,2" />
+        </Style>
+        
+        <Style Selector="TreeViewItem:selected">
+            <Setter Property="Background" Value="#2196F3" />
+        </Style>
+        
+        <Style Selector="ListBoxItem">
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Padding" Value="4,2" />
+        </Style>
+        
+        <Style Selector="ListBoxItem:selected">
+            <Setter Property="Background" Value="#2196F3" />
+        </Style>
+        
+        <Style Selector="CheckBox">
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        
+        <Style Selector="GridSplitter">
+            <Setter Property="Background" Value="#404040" />
+        </Style>
+        
+        <Style Selector="GridSplitter:pointerover">
+            <Setter Property="Background" Value="#2196F3" />
+        </Style>
+        
+    </Application.Styles>
+</Application>

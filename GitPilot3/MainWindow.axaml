@@ -1,0 +1,334 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="800"
+        x:Class="GitPilot3.MainWindow"
+        Title="GitPilot3 - Git Client"
+        MinWidth="1000" MinHeight="600"
+        WindowStartupLocation="CenterScreen">
+    
+    <Grid>
+        <Grid.RowDefinitions>
+            <!-- Menu Bar -->
+            <RowDefinition Height="Auto"/>
+            <!-- Toolbar -->
+            <RowDefinition Height="Auto"/>
+            <!-- Main Content Area -->
+            <RowDefinition Height="*"/>
+            <!-- Status Bar -->
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Main Menu Bar -->
+        <Menu Grid.Row="0" Background="#2D2D2D">
+            <MenuItem Header="_File">
+                <MenuItem Header="Open Repository..." />
+                <MenuItem Header="Clone Repository..." />
+                <MenuItem Header="-" />
+                <MenuItem Header="Recent Repositories" />
+                <MenuItem Header="-" />
+                <MenuItem Header="Exit" />
+            </MenuItem>
+            <MenuItem Header="_Edit">
+                <MenuItem Header="Preferences..." />
+            </MenuItem>
+            <MenuItem Header="_Repository">
+                <MenuItem Header="Fetch" />
+                <MenuItem Header="Pull" />
+                <MenuItem Header="Push" />
+                <MenuItem Header="-" />
+                <MenuItem Header="Branch..." />
+                <MenuItem Header="Merge..." />
+                <MenuItem Header="Rebase..." />
+            </MenuItem>
+            <MenuItem Header="_View">
+                <MenuItem Header="Refresh" />
+                <MenuItem Header="Show All Branches" />
+                <MenuItem Header="Show Tags" />
+            </MenuItem>
+            <MenuItem Header="_Help">
+                <MenuItem Header="Documentation" />
+                <MenuItem Header="About" />
+            </MenuItem>
+        </Menu>
+
+        <!-- Toolbar -->
+        <Border Classes="Toolbar" Grid.Row="1">
+            <StackPanel Orientation="Horizontal" Margin="10,0" VerticalAlignment="Center">
+                <Button Classes="Primary" Content="Clone" />
+                <Rectangle Width="1" Height="20" Fill="{StaticResource BorderLightBrush}" Margin="5,0"/>
+                <Button Classes="Secondary Toolbar" Content="Fetch" />
+                <Button Classes="Success Toolbar" Content="Pull" />
+                <Button Classes="Warning Toolbar" Content="Push" />
+                <Rectangle Width="1" Height="20" Fill="{StaticResource BorderLightBrush}" Margin="5,0"/>
+                <Button Classes="Secondary Toolbar" Content="Branch" />
+                <Button Classes="Secondary Toolbar" Content="Merge" />
+                <Rectangle Width="1" Height="20" Fill="{StaticResource BorderLightBrush}" Margin="5,0"/>
+                <Button Classes="Secondary Toolbar" Content="Stash" />
+                <Button Classes="Secondary Toolbar" Content="Pop" />
+            </StackPanel>
+        </Border>
+
+        <!-- Main Content Area -->
+        <Grid Grid.Row="2" Background="#1E1E1E">
+            <Grid.ColumnDefinitions>
+                <!-- Left Sidebar -->
+                <ColumnDefinition Width="300" MinWidth="200"/>
+                <ColumnDefinition Width="Auto"/>
+                <!-- Main Graph Area -->
+                <ColumnDefinition Width="2*" MinWidth="400"/>
+                <ColumnDefinition Width="Auto"/>
+                <!-- Right Details Panel -->
+                <ColumnDefinition Width="350" MinWidth="250"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Left Sidebar Panel -->
+            <Border Classes="Sidebar" Grid.Column="0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="200"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Repository Header -->
+                    <Border Classes="Header" Grid.Row="0">
+                        <StackPanel>
+                            <TextBlock Classes="Caption" Text="Current Repository"/>
+                            <TextBlock Classes="H5" Text="GitPilot3" Margin="0,5,0,0"/>
+                            <TextBlock Classes="FilePath" Text="/Users/pinsopheaktra/Documents/Clones/GitPilot3"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Branches Tree -->
+                    <ScrollViewer Grid.Row="1" Margin="5">
+                        <TreeView Background="Transparent" Foreground="White">
+                            <TreeViewItem Header="Branches" IsExpanded="True" FontWeight="Bold">
+                                <TreeViewItem Header="main" IsSelected="True">
+                                    <TreeViewItem.HeaderTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Ellipse Width="8" Height="8" Fill="#4CAF50" Margin="0,0,5,0"/>
+                                                <TextBlock Text="main" Foreground="White"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </TreeViewItem.HeaderTemplate>
+                                </TreeViewItem>
+                                <TreeViewItem Header="develop">
+                                    <TreeViewItem.HeaderTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Ellipse Width="8" Height="8" Fill="#2196F3" Margin="0,0,5,0"/>
+                                                <TextBlock Text="develop" Foreground="White"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </TreeViewItem.HeaderTemplate>
+                                </TreeViewItem>
+                            </TreeViewItem>
+                            <TreeViewItem Header="Remote Branches" IsExpanded="False" FontWeight="Bold">
+                                <TreeViewItem Header="origin/main">
+                                    <TreeViewItem.HeaderTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Ellipse Width="8" Height="8" Fill="#FF9800" Margin="0,0,5,0"/>
+                                                <TextBlock Text="origin/main" Foreground="White"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </TreeViewItem.HeaderTemplate>
+                                </TreeViewItem>
+                            </TreeViewItem>
+                            <TreeViewItem Header="Tags" FontWeight="Bold">
+                                <TreeViewItem Header="v1.0.0"/>
+                                <TreeViewItem Header="v0.9.0"/>
+                            </TreeViewItem>
+                        </TreeView>
+                    </ScrollViewer>
+
+                    <!-- Working Directory Header -->
+                    <Border Classes="Section" Grid.Row="2">
+                        <TextBlock Classes="H6" Text="Working Directory"/>
+                    </Border>
+
+                    <!-- File Changes -->
+                    <ScrollViewer Grid.Row="3" Margin="5">
+                        <StackPanel>
+                            <TextBlock Classes="Label SuccessText" Text="Staged Changes" Margin="0,5"/>
+                            <ListBox Classes="ListContainer" SelectionMode="Multiple">
+                                <ListBoxItem>
+                                    <TextBlock Classes="GitAdded" Text="📄 MainWindow.axaml"/>
+                                </ListBoxItem>
+                            </ListBox>
+                            
+                            <TextBlock Classes="Label WarningText" Text="Unstaged Changes" Margin="0,15,0,5"/>
+                            <ListBox Classes="ListContainer" SelectionMode="Multiple">
+                                <ListBoxItem>
+                                    <TextBlock Classes="GitModified" Text="📄 App.axaml.cs"/>
+                                </ListBoxItem>
+                                <ListBoxItem>
+                                    <TextBlock Classes="GitModified" Text="📄 Program.cs"/>
+                                </ListBoxItem>
+                            </ListBox>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+
+            <!-- Left Splitter -->
+            <GridSplitter Grid.Column="1" Width="3" Background="#404040" HorizontalAlignment="Center"/>
+
+            <!-- Main Graph Visualization Area -->
+            <Border Classes="Content" Grid.Column="2">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Graph Header/Controls -->
+                    <Border Classes="Header" Grid.Row="0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Classes="H4" Text="Commit Graph" VerticalAlignment="Center"/>
+                            <Button Classes="Secondary Small" Content="All Branches" Margin="20,0,0,0"/>
+                            <CheckBox Content="Show Tags" Margin="10,0,0,0" IsChecked="True"/>
+                            <CheckBox Content="Show Merge Commits" Margin="10,0,0,0" IsChecked="True"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Graph Content Area -->
+                    <ScrollViewer Grid.Row="1">
+                        <Canvas MinHeight="400" MinWidth="600">
+                            <!-- This is where the commit graph will be rendered -->
+                            <!-- Placeholder visualization with proper styling -->
+                            <Ellipse Classes="CommitNode CommitNodeCurrent" Canvas.Left="50" Canvas.Top="50"/>
+                            <Line Classes="BranchLine BranchLineCurrent" StartPoint="56,66" EndPoint="56,116"/>
+                            <Ellipse Classes="CommitNode CommitNodeLocal" Canvas.Left="50" Canvas.Top="120"/>
+                            <Line Classes="BranchLine BranchLineLocal" StartPoint="56,136" EndPoint="56,186"/>
+                            <Ellipse Classes="CommitNode CommitNodeRemote" Canvas.Left="50" Canvas.Top="190"/>
+                            
+                            <!-- Commit messages -->
+                            <TextBlock Classes="CommitMessage" Canvas.Left="80" Canvas.Top="52" Text="feat: Initial commit graph layout"/>
+                            <TextBlock Classes="CommitMessage" Canvas.Left="80" Canvas.Top="122" Text="style: Update main window design"/>
+                            <TextBlock Classes="CommitMessage" Canvas.Left="80" Canvas.Top="192" Text="docs: Add README documentation"/>
+                            
+                            <!-- Author and timestamp -->
+                            <StackPanel Canvas.Left="80" Canvas.Top="72" Orientation="Horizontal">
+                                <TextBlock Classes="AuthorName" Text="John Doe"/>
+                                <TextBlock Classes="Timestamp" Text=" • 2 hours ago"/>
+                            </StackPanel>
+                            <StackPanel Canvas.Left="80" Canvas.Top="142" Orientation="Horizontal">
+                                <TextBlock Classes="AuthorName" Text="Jane Smith"/>
+                                <TextBlock Classes="Timestamp" Text=" • 1 day ago"/>
+                            </StackPanel>
+                            <StackPanel Canvas.Left="80" Canvas.Top="212" Orientation="Horizontal">
+                                <TextBlock Classes="AuthorName" Text="Bob Johnson"/>
+                                <TextBlock Classes="Timestamp" Text=" • 3 days ago"/>
+                            </StackPanel>
+                        </Canvas>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+
+            <!-- Right Splitter -->
+            <GridSplitter Grid.Column="3" Width="3" Background="#404040" HorizontalAlignment="Center"/>
+
+            <!-- Right Details Panel -->
+            <Border Classes="Sidebar" Grid.Column="4" BorderThickness="1,0,0,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="200"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Commit Details Header -->
+                    <Border Classes="Header" Grid.Row="0">
+                        <TextBlock Classes="H6" Text="Commit Details"/>
+                    </Border>
+
+                    <!-- Commit Information -->
+                    <ScrollViewer Grid.Row="1" Margin="10">
+                        <StackPanel>
+                            <TextBlock Classes="CommitMessage" Text="feat: Initial commit graph layout" TextWrapping="Wrap"/>
+                            <TextBlock Classes="CommitHash" Text="SHA: a1b2c3d4e5f6" Margin="0,10,0,0"/>
+                            <TextBlock Classes="AuthorName" Text="Author: John Doe" Margin="0,5,0,0"/>
+                            <TextBlock Classes="Timestamp" Text="Date: Oct 25, 2025 10:30 AM" Margin="0,5,0,0"/>
+                            <TextBlock Classes="BranchName" Text="Branch: main" Margin="0,5,0,0"/>
+                            
+                            <TextBlock Classes="Label" Text="Description:" Margin="0,15,0,5"/>
+                            <TextBlock Classes="Body" Text="Added initial layout structure for the main window with proper grid system and navigation panels." 
+                                     TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- File Changes Header -->
+                    <Border Classes="Section" Grid.Row="2">
+                        <TextBlock Classes="H6" Text="Changed Files (3)"/>
+                    </Border>
+
+                    <!-- File Changes List -->
+                    <ScrollViewer Grid.Row="3" Margin="5">
+                        <StackPanel>
+                            <Border Classes="FileAdded">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Classes="FileIcon" Text="📄"/>
+                                        <TextBlock Classes="Body" Text="MainWindow.axaml"/>
+                                        <TextBlock Classes="CodeInline GitAdded" Text="+45 -12" Margin="10,0,0,0"/>
+                                    </StackPanel>
+                                    <TextBlock Classes="Caption" Text="Modified window layout structure" Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="FileAdded">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Classes="FileIcon" Text="📄"/>
+                                        <TextBlock Classes="Body" Text="MainWindow.axaml.cs"/>
+                                        <TextBlock Classes="CodeInline GitAdded" Text="+23 -5" Margin="10,0,0,0"/>
+                                    </StackPanel>
+                                    <TextBlock Classes="Caption" Text="Added event handlers for new UI elements" Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="FileModified">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Classes="FileIcon" Text="📄"/>
+                                        <TextBlock Classes="Body" Text="App.axaml"/>
+                                        <TextBlock Classes="CodeInline GitModified" Text="+8 -2" Margin="10,0,0,0"/>
+                                    </StackPanel>
+                                    <TextBlock Classes="Caption" Text="Updated application theme" Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Status Bar -->
+        <Border Classes="Footer" Grid.Row="3">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="10,0">
+                    <TextBlock Classes="SuccessText" Text="Ready" VerticalAlignment="Center"/>
+                    <TextBlock Classes="TextMuted" Text=" • " VerticalAlignment="Center"/>
+                    <TextBlock Classes="BranchCurrent" Text="Branch: main" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <TextBlock Classes="SyncAhead" Grid.Column="1" Text="↑ 2" VerticalAlignment="Center" Margin="10,0" ToolTip.Tip="Commits ahead"/>
+                <TextBlock Classes="SyncBehind" Grid.Column="2" Text="↓ 1" VerticalAlignment="Center" Margin="10,0" ToolTip.Tip="Commits behind"/>
+                <TextBlock Classes="Body" Grid.Column="3" Text="5 files changed" VerticalAlignment="Center" Margin="10,0"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

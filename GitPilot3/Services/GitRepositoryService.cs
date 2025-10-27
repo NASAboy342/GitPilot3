@@ -151,15 +151,16 @@ public class GitRepositoryService : IGitRepositoryService
             {
                 var patch = libgitRepository.Diff.Compare<Patch>(libgitCommit.Parents.First().Tree, libgitCommit.Tree, new[] { change.Path });
                 var patchEntry = patch.FirstOrDefault(p => p.Path == change.Path);
-                var fileChange = new GitCommitFileChange
-                {
-                    FilePath = change.Path,
-                    ChangeType = change.Status.ToString(),
-                    Additions = patchEntry?.LinesAdded ?? 0,
-                    Deletions = patchEntry?.LinesDeleted ?? 0,
-                    DiffContent = patchEntry?.Patch ?? "",
-                    FileContent = libgitRepository.Lookup<LibGit2Sharp.Blob>(libgitCommit.Tree[change.Path]?.Target.Id)?.GetContentText() ?? ""
-                };
+                var fileChange = new GitCommitFileChange();
+                fileChange.FilePath = change.Path;
+                fileChange.ChangeType = change.Status.ToString();
+                fileChange.Additions = patchEntry?.LinesAdded ?? 0;
+                fileChange.Deletions = patchEntry?.LinesDeleted ?? 0;
+                fileChange.DiffContent = patchEntry?.Patch ?? "";
+                fileChange.IsStaged = true;
+
+                var blob = libgitCommit.Tree[change.Path]?.Target.Id;
+                fileChange.FileContent = blob != null ? libgitRepository.Lookup<LibGit2Sharp.Blob>(blob)?.GetContentText() : "";
                 commitDetail.FilesChanged.Add(fileChange);
             }
         }
@@ -171,7 +172,38 @@ public class GitRepositoryService : IGitRepositoryService
         var libgitRepository = new Repository(path);
         var commitDetail = new GitCommitDetail();
         commitDetail.Commit = commit;
+        AppendUnstagedChanges(libgitRepository, commitDetail);
+        AppendStagedChanges(libgitRepository, commitDetail);
 
+        return commitDetail;
+    }
+
+    private static void AppendStagedChanges(Repository libgitRepository, GitCommitDetail commitDetail)
+    {
+        var changes = libgitRepository.Diff.Compare<TreeChanges>(null, DiffTargets.Index);
+
+        foreach (var change in changes)
+        {
+            var patch = libgitRepository.Diff.Compare<Patch>(null, DiffTargets.Index, new[] { change.Path });
+            var patchEntry = patch.FirstOrDefault(p => p.Path == change.Path);
+
+            var fileChange = new GitCommitFileChange();
+            fileChange.FilePath = change.Path;
+            fileChange.ChangeType = change.Status.ToString();
+            fileChange.Additions = patchEntry?.LinesAdded ?? 0;
+            fileChange.Deletions = patchEntry?.LinesDeleted ?? 0;
+            fileChange.DiffContent = patchEntry?.Patch ?? "";
+            fileChange.IsStaged = true;
+
+            var blob = libgitRepository.Index[change.Path]?.Id;
+            fileChange.FileContent = blob != null ? libgitRepository.Lookup<LibGit2Sharp.Blob>(blob)?.GetContentText() : "";
+
+            commitDetail.FilesChanged.Add(fileChange);
+        }
+    }
+
+    private static void AppendUnstagedChanges(Repository libgitRepository, GitCommitDetail commitDetail)
+    {
         var changes = libgitRepository.Diff.Compare<TreeChanges>(libgitRepository.Head.Tip.Tree, DiffTargets.WorkingDirectory);
 
         foreach (var change in changes)
@@ -185,13 +217,26 @@ public class GitRepositoryService : IGitRepositoryService
             fileChange.Additions = patchEntry?.LinesAdded ?? 0;
             fileChange.Deletions = patchEntry?.LinesDeleted ?? 0;
             fileChange.DiffContent = patchEntry?.Patch ?? "";
+            fileChange.IsStaged = false;
 
             var blob = libgitRepository.Head.Tip.Tree[change.Path]?.Target.Id;
             fileChange.FileContent = blob != null ? libgitRepository.Lookup<LibGit2Sharp.Blob>(blob)?.GetContentText() : "";
 
             commitDetail.FilesChanged.Add(fileChange);
         }
+    }
 
-        return commitDetail;
+    public Task StageFilesAsync(string path, List<string> unstageFilePaths)
+    {
+        var libgitRepository = new Repository(path);
+        Commands.Stage(libgitRepository, unstageFilePaths);
+        return Task.CompletedTask;
+    }
+
+    public Task UnStageFilesAsync(string path, List<string> list)
+    {
+        var libgitRepository = new Repository(path);
+        Commands.Unstage(libgitRepository, list);
+        return Task.CompletedTask;
     }
 }

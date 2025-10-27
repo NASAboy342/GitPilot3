@@ -17,9 +17,9 @@
             <Setter Property="Background" Value="rgb(43,45,46)" />
         </Style>
 
-        <Style Selector="Border.fileChangeBorder">
+        <Style Selector="StackPanel.fileChangeBorder">
         </Style>
-        <Style Selector="Border.fileChangeBorder:pointerover">
+        <Style Selector="StackPanel.fileChangeBorder:pointerover">
             <Setter Property="Background" Value="rgb(43,45,46)" />
         </Style>
     </Window.Styles>
@@ -209,6 +209,8 @@
                         <RowDefinition MinHeight="100" Height="150"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="2*"/>
                     </Grid.RowDefinitions>
 
                     <!-- Commit Details Header -->
@@ -230,6 +232,12 @@
                     <!-- File Changes List -->
                     <ScrollViewer Grid.Row="4" Margin="5">
                         <StackPanel x:Name="FileChangesStackPanel">
+                        </StackPanel>
+                    </ScrollViewer>
+                    <GridSplitter x:Name="FileChangesSplitter" Grid.Row="5" Height="1" HorizontalAlignment="Stretch" IsVisible="false"/>
+
+                    <ScrollViewer x:Name="StagedFileChangesScrollViewer" Grid.Row="6" Margin="5" IsVisible="false">
+                        <StackPanel x:Name="StagedFileChangesStackPanel">
                         </StackPanel>
                     </ScrollViewer>
                 </Grid>

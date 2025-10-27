@@ -22,4 +22,5 @@ public class GitCommitFileChange
     public int Deletions { get; set; }
     public string FileContent { get; set; } = "";
     public string DiffContent { get; set; } = "";
+    public bool IsStaged { get; set; } = true;
 }

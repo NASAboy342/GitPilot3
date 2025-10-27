@@ -9,6 +9,8 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using AvaloniaEdit;
+using System.Collections.Generic;
+using LibGit2Sharp;
 
 namespace GitPilot3;
 
@@ -188,27 +190,42 @@ public partial class MainWindow : Window
         UpdateCommitDetailMessagePanel();
         UpdateFileChangesHeaderView();
         UpdateFileChangesStackPanel();
+        UpdateStagedFileChangesStackPanel();
     }
 
-    private void UpdateFileChangesStackPanel()
+    private void UpdateStagedFileChangesStackPanel()
     {
-        var fileChangesStackPanel = this.FindControl<StackPanel>("FileChangesStackPanel");
-        if (fileChangesStackPanel == null)
+        if (CurrentRepository.CommitDetail == null || !CurrentRepository.CommitDetail.Commit.IsWorkInProgress)
             return;
 
-        fileChangesStackPanel.Children.Clear();
+        var stagedFileChangesStackPanel = this.FindControl<StackPanel>("StagedFileChangesStackPanel");
+        if (stagedFileChangesStackPanel == null)
+            return;
 
-        foreach (var fileChange in CurrentRepository.CommitDetail.FilesChanged)
+        stagedFileChangesStackPanel.Children.Clear();
+
+        var stagedHeader = new TextBlock
         {
-            var fileChangeItem = new Border
+            Text = "Staged Changes",
+            FontSize = 14,
+            FontWeight = Avalonia.Media.FontWeight.Bold,
+            Margin = new Avalonia.Thickness(5, 10, 0, 5)
+        };
+        stagedFileChangesStackPanel.Children.Add(stagedHeader);
+
+        foreach (var fileChange in CurrentRepository.CommitDetail.FilesChanged.Where(f => f.IsStaged))
+        {
+            var fileChangeItem = new DockPanel
             {
                 Height = 30,
                 Classes = { "fileChangeBorder" },
-                Child = new StackPanel
-                {
-                    Orientation = Avalonia.Layout.Orientation.Horizontal,
+            };
 
-                    Children =
+            var fileInfo = new StackPanel
+            {
+                Orientation = Avalonia.Layout.Orientation.Horizontal,
+
+                Children =
                     {
                         new TextBlock
                         {
@@ -237,13 +254,151 @@ public partial class MainWindow : Window
                             Margin = new Avalonia.Thickness(5, 0, 0, 0)
                         }
                     }
-                }
             };
-            fileChangeItem.Tapped += async (sender, e) =>
+            DockPanel.SetDock(fileInfo, Dock.Left);
+            fileInfo.Tapped += async (sender, e) =>
             {
                 await ShowFileChangeDetail(fileChange);
             };
+
+            var unstageFileButton = new Button
+            {
+                Content = "−",
+                Foreground = Brushes.White,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                Height = 20,
+                Width = 20,
+                Padding = new Avalonia.Thickness(5, 0, 5, 0)
+            };
+
+            unstageFileButton.Click += async (sender, e) =>
+            {
+                await UnstageFileChange(fileChange);
+            };
+            DockPanel.SetDock(unstageFileButton, Dock.Right);
+
+            fileChangeItem.Children.Add(unstageFileButton);
+            fileChangeItem.Children.Add(fileInfo);
+            stagedFileChangesStackPanel.Children.Add(fileChangeItem);
+
+            var fileChangesSplitter = this.FindControl<GridSplitter>("FileChangesSplitter");
+            var stagedFileChangesScrollViewer = this.FindControl<ScrollViewer>("StagedFileChangesScrollViewer");
+
+            if (stagedFileChangesScrollViewer != null && fileChangesSplitter != null)
+            {
+                fileChangesSplitter.IsVisible = true;
+                stagedFileChangesScrollViewer.IsVisible = true;
+            }
+        }
+    }
+
+    private async Task UnstageFileChange(GitCommitFileChange fileChange)
+    {
+        if (CurrentRepository.CommitDetail.Commit.IsWorkInProgress)
+        {
+            await _gitRepositoryService.UnStageFilesAsync(CurrentRepository.Path, new List<string> { fileChange.FilePath });
+            UpdateFileChangesView();
+        }
+    }
+
+    private void UpdateFileChangesStackPanel()
+    {
+        var fileChangesStackPanel = this.FindControl<StackPanel>("FileChangesStackPanel");
+        if (fileChangesStackPanel == null)
+            return;
+
+        fileChangesStackPanel.Children.Clear();
+
+        var stagedHeader = new TextBlock
+        {
+            Text = "Changes",
+            FontSize = 14,
+            FontWeight = Avalonia.Media.FontWeight.Bold,
+            Margin = new Avalonia.Thickness(5, 10, 0, 5)
+        };
+        fileChangesStackPanel.Children.Add(stagedHeader);
+
+        var fileChanges = CurrentRepository.CommitDetail.FilesChanged.Where(f => !CurrentRepository.CommitDetail.Commit.IsWorkInProgress || !f.IsStaged).ToList();
+
+        foreach (var fileChange in fileChanges)
+        {
+            var fileChangeItem = new DockPanel
+            {
+                Height = 30,
+            };
+
+            var fileInfo = new StackPanel
+            {
+                Orientation = Avalonia.Layout.Orientation.Horizontal,
+                Classes = { "fileChangeBorder" },
+                Children =
+                    {
+                        new TextBlock
+                        {
+                            Text = GetChangeTypeSymbol(fileChange.ChangeType),
+                            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                            Margin = new Avalonia.Thickness(5, 0, 0, 0)
+                        },
+                        new TextBlock
+                        {
+                            Text = fileChange.FileName,
+                            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                            Margin = new Avalonia.Thickness(5, 0, 0, 0)
+                        },
+                        new TextBlock
+                        {
+                            Text = $"+{fileChange.Additions}",
+                            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                            Foreground = Brushes.Green,
+                            Margin = new Avalonia.Thickness(5, 0, 0, 0)
+                        },
+                        new TextBlock
+                        {
+                            Text = $"-{fileChange.Deletions}",
+                            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                            Foreground = Brushes.OrangeRed,
+                            Margin = new Avalonia.Thickness(5, 0, 0, 0)
+                        }
+                    }
+            };
+            DockPanel.SetDock(fileInfo, Dock.Left);
+
+            var stagedFileButton = new Button
+            {
+                Content = "+",
+                Foreground = Brushes.White,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                Height = 20,
+                Width = 20,
+                Padding = new Avalonia.Thickness(5, 0, 5, 0)
+            };
+            DockPanel.SetDock(stagedFileButton, Dock.Right);
+
+            stagedFileButton.Click += async (sender, e) =>
+            {
+                await StageFilesAsync(new List<string> { fileChange.FilePath });
+            };
+
+            fileInfo.Tapped += async (sender, e) =>
+            {
+                await ShowFileChangeDetail(fileChange);
+            };
+
+            fileChangeItem.Children.Add(fileInfo);
+            fileChangeItem.Children.Add(stagedFileButton);
+
             fileChangesStackPanel.Children.Add(fileChangeItem);
+        }
+    }
+
+    private async Task StageFilesAsync(List<string> unstageFilePaths)
+    {
+        if (CurrentRepository.CommitDetail.Commit.IsWorkInProgress)
+        {
+            await _gitRepositoryService.StageFilesAsync(CurrentRepository.Path, unstageFilePaths);
+            UpdateFileChangesView();
         }
     }
 
@@ -291,7 +446,7 @@ public partial class MainWindow : Window
             else if (line.StartsWith("-"))
             {
                 lineColor = Brushes.IndianRed;
-            } 
+            }
             stackPanel.Children.Add(new TextBlock
             {
                 Text = line,

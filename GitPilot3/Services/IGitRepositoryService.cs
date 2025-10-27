@@ -13,4 +13,6 @@ public interface IGitRepositoryService
     Task CheckoutBranchAsync(GitRepository currentRepository, string name);
     Task<List<GitCommit>> GetCommitsAsync(string repositoryPath);
     Task<GitCommitDetail> GetCommitDetailsAsync(string path, GitCommit commit);
+    Task StageFilesAsync(string path, List<string> unstageFilePaths);
+    Task UnStageFilesAsync(string path, List<string> list);
 }

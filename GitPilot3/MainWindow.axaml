@@ -2,7 +2,6 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:avaloniaEdit="clr-namespace:AvaloniaEdit;assembly=AvaloniaEdit"
         mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="800"
         x:Class="GitPilot3.MainWindow"
         Title="GitPilot3 - Git Client"
@@ -22,6 +21,12 @@
         <Style Selector="StackPanel.fileChangeBorder:pointerover">
             <Setter Property="Background" Value="rgb(43,45,46)" />
         </Style>
+        <Style Selector="TextBox.CommitMessageTextBox">
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+        <Style Selector="TextBox.CommitDescriptionTextBox">
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
     </Window.Styles>
     
     <Grid>
@@ -35,56 +40,32 @@
             <!-- Status Bar -->
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-
-        <!-- Main Menu Bar -->
-        <!-- <Menu Grid.Row="0" Background="#2D2D2D">
-            <MenuItem Header="_File">
-                <MenuItem Header="Open Repository..." />
-                <MenuItem Header="Clone Repository..." />
-                <MenuItem Header="-" />
-                <MenuItem Header="Recent Repositories" />
-                <MenuItem Header="-" />
-                <MenuItem Header="Exit" />
-            </MenuItem>
-            <MenuItem Header="_Edit">
-                <MenuItem Header="Preferences..." />
-            </MenuItem>
-            <MenuItem Header="_Repository">
-                <MenuItem Header="Fetch" />
-                <MenuItem Header="Pull" />
-                <MenuItem Header="Push" />
-                <MenuItem Header="-" />
-                <MenuItem Header="Branch..." />
-                <MenuItem Header="Merge..." />
-                <MenuItem Header="Rebase..." />
-            </MenuItem>
-            <MenuItem Header="_View">
-                <MenuItem Header="Refresh" />
-                <MenuItem Header="Show All Branches" />
-                <MenuItem Header="Show Tags" />
-            </MenuItem>
-            <MenuItem Header="_Help">
-                <MenuItem Header="Documentation" />
-                <MenuItem Header="About" />
-            </MenuItem>
-        </Menu> -->
-
         <!-- Toolbar -->
         <Border Classes="Toolbar" Grid.Row="1">
-            <StackPanel Orientation="Horizontal" Margin="10,0" VerticalAlignment="Center" HorizontalAlignment="Center">
-                <Button Classes="Secondary" Content="Clone" />
-                <Button Classes="Secondary" Content="Open" Click="OnOpenRepository"/>
-                <Rectangle Width="1" Height="20" Fill="{StaticResource BorderLightBrush}" Margin="5,0"/>
-                <Button Classes="Secondary Toolbar" Content="Fetch" />
-                <Button Classes="Secondary Toolbar" Content="Pull" />
-                <Button Classes="Secondary Toolbar" Content="Push" />
-                <Rectangle Width="1" Height="20" Fill="{StaticResource BorderLightBrush}" Margin="5,0"/>
-                <Button Classes="Secondary Toolbar" Content="Branch" />
-                <Button Classes="Secondary Toolbar" Content="Merge" />
-                <Rectangle Width="1" Height="20" Fill="{StaticResource BorderLightBrush}" Margin="5,0"/>
-                <Button Classes="Secondary Toolbar" Content="Stash" />
-                <Button Classes="Secondary Toolbar" Content="Pop" />
-            </StackPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="100"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="10,0" VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <Button Classes="Secondary" Content="Clone" />
+                    <Button Classes="Secondary" Content="Open" Click="OnOpenRepository"/>
+                    <Rectangle Width="1" Height="20" Fill="{StaticResource BorderLightBrush}" Margin="5,0"/>
+                    <Button Classes="Secondary Toolbar" Content="Fetch" />
+                    <Button Classes="Secondary Toolbar" Content="Pull" />
+                    <Button Classes="Secondary Toolbar" Content="Push" Click="OnPush"/>
+                    <Rectangle Width="1" Height="20" Fill="{StaticResource BorderLightBrush}" Margin="5,0"/>
+                    <Button Classes="Secondary Toolbar" Content="Branch" />
+                    <Button Classes="Secondary Toolbar" Content="Merge" />
+                    <Rectangle Width="1" Height="20" Fill="{StaticResource BorderLightBrush}" Margin="5,0"/>
+                    <Button Classes="Secondary Toolbar" Content="Stash" />
+                    <Button Classes="Secondary Toolbar" Content="Pop" />
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="10,0" VerticalAlignment="Center" HorizontalAlignment="Right">
+                    <Button Classes="Secondary Toolbar" Content="Profile" Click="OnOpenProfile"/>
+                </StackPanel>
+            </Grid>
         </Border>
 
         <!-- Main Content Area -->
@@ -143,21 +124,9 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-
-                    <!-- Graph Header/Controls -->
-                    <!-- <Border Classes="Header" Grid.Row="0">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Classes="H4" Text="Commit Graph" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Border> -->
                     <ScrollViewer x:Name="FileContentScrollViewer" Grid.Row="1" IsVisible="false">
                     </ScrollViewer>
-
-
-                    <!-- Graph Content Area -->
                     <ScrollViewer x:Name="CommitGraphScrollViewer" Grid.Row="1" IsVisible="true">
-                        <!-- <Canvas x:Name="CommitGraphCanvas" MinHeight="400" MinWidth="600" >
-                        </Canvas> -->
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <!-- Branchname -->
@@ -190,8 +159,6 @@
 
                             <StackPanel Grid.Column="6" x:Name="CommitDateHeaderStackPanel">
                             </StackPanel>
-                                <!-- Branch Names will be added here dynamically -->
-
                         </Grid>
                     </ScrollViewer>
                 </Grid>
@@ -208,9 +175,10 @@
                         <RowDefinition Height="100"/>
                         <RowDefinition MinHeight="100" Height="150"/>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
+                        <RowDefinition MinHeight="100" Height="*"/>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="2*"/>
+                        <RowDefinition MinHeight="50" Height="2*"/>
+                        <RowDefinition Height="150" MinHeight="150"/>
                     </Grid.RowDefinitions>
 
                     <!-- Commit Details Header -->
@@ -234,12 +202,22 @@
                         <StackPanel x:Name="FileChangesStackPanel">
                         </StackPanel>
                     </ScrollViewer>
-                    <GridSplitter x:Name="FileChangesSplitter" Grid.Row="5" Height="1" HorizontalAlignment="Stretch" IsVisible="false"/>
+                    <GridSplitter x:Name="FileChangesSplitter" Grid.Row="5" Height="1" HorizontalAlignment="Stretch" IsVisible="true"/>
 
                     <ScrollViewer x:Name="StagedFileChangesScrollViewer" Grid.Row="6" Margin="5" IsVisible="false">
                         <StackPanel x:Name="StagedFileChangesStackPanel">
                         </StackPanel>
                     </ScrollViewer>
+
+                    <StackPanel x:Name="CommitInputScrollViewer" Grid.Row="7" Margin="5" IsVisible="false">
+                        <StackPanel Orientation="Vertical" Background="black">
+                            <TextBox x:Name="CommitMessageTextBox" Classes="CommitMessageTextBox" AcceptsReturn="True" Watermark="Enter commit message..." TextWrapping="NoWrap"/>
+                            <TextBox x:Name="CommitDescriptionTextBox" Classes="CommitDescriptionTextBox" AcceptsReturn="True" Watermark="description..." TextWrapping="Wrap" Height="70"/>
+                        </StackPanel>
+                        <Button x:Name="CommitButton" Classes="Primary Large" Grid.Row="" Margin="10" HorizontalAlignment="Stretch" Click="OnCommitButtonClick">
+                            <TextBlock Text="Commit Changes" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Button>
+                    </StackPanel>
                 </Grid>
             </Border>
         </Grid>

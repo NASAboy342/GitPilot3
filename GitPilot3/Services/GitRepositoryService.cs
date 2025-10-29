@@ -55,7 +55,7 @@ public class GitRepositoryService : IGitRepositoryService
 
     public async Task<GitRepository> LoadRepositoryAsync(string? repositoryPath)
     {
-        if(string.IsNullOrEmpty(repositoryPath))
+        if (string.IsNullOrEmpty(repositoryPath))
         {
             return new GitRepository();
         }
@@ -144,7 +144,8 @@ public class GitRepositoryService : IGitRepositoryService
         var commitDetail = new GitCommitDetail();
         commitDetail.Commit = commit;
 
-        if(libgitCommit.Parents.Any()){
+        if (libgitCommit.Parents.Any())
+        {
             var changes = libgitRepository.Diff.Compare<TreeChanges>(libgitCommit.Parents.First().Tree, libgitCommit.Tree);
 
             foreach (var change in changes)
@@ -180,49 +181,67 @@ public class GitRepositoryService : IGitRepositoryService
 
     private static void AppendStagedChanges(Repository libgitRepository, GitCommitDetail commitDetail)
     {
-        var changes = libgitRepository.Diff.Compare<TreeChanges>(null, DiffTargets.Index);
+        var status = libgitRepository.RetrieveStatus();
+        var changes = libgitRepository.Diff.Compare<TreeChanges>(libgitRepository.Head.Tip.Tree, DiffTargets.Index);
 
-        foreach (var change in changes)
+        foreach (var entry in status)
         {
-            var patch = libgitRepository.Diff.Compare<Patch>(null, DiffTargets.Index, new[] { change.Path });
-            var patchEntry = patch.FirstOrDefault(p => p.Path == change.Path);
+            if (entry.State.HasFlag(FileStatus.NewInIndex) ||
+                entry.State.HasFlag(FileStatus.ModifiedInIndex) ||
+                entry.State.HasFlag(FileStatus.DeletedFromIndex) ||
+                entry.State.HasFlag(FileStatus.RenamedInIndex) ||
+                entry.State.HasFlag(FileStatus.TypeChangeInIndex))
+            {
+                var change = changes.FirstOrDefault(c => c.Path == entry.FilePath);
+                var patch = libgitRepository.Diff.Compare<Patch>(null, DiffTargets.Index, new[] { entry.FilePath });
+                var patchEntry = patch.FirstOrDefault(p => p.Path == entry.FilePath);
 
-            var fileChange = new GitCommitFileChange();
-            fileChange.FilePath = change.Path;
-            fileChange.ChangeType = change.Status.ToString();
-            fileChange.Additions = patchEntry?.LinesAdded ?? 0;
-            fileChange.Deletions = patchEntry?.LinesDeleted ?? 0;
-            fileChange.DiffContent = patchEntry?.Patch ?? "";
-            fileChange.IsStaged = true;
+                var fileChange = new GitCommitFileChange();
+                fileChange.FilePath = entry.FilePath;
+                fileChange.ChangeType = change?.Status.ToString() ?? "";
+                fileChange.Additions = patchEntry?.LinesAdded ?? 0;
+                fileChange.Deletions = patchEntry?.LinesDeleted ?? 0;
+                fileChange.DiffContent = patchEntry?.Patch ?? "";
+                fileChange.IsStaged = true;
 
-            var blob = libgitRepository.Index[change.Path]?.Id;
-            fileChange.FileContent = blob != null ? libgitRepository.Lookup<LibGit2Sharp.Blob>(blob)?.GetContentText() : "";
+                var blob = libgitRepository.Index[entry.FilePath]?.Id;
+                fileChange.FileContent = blob != null ? libgitRepository.Lookup<LibGit2Sharp.Blob>(blob)?.GetContentText() : "";
 
-            commitDetail.FilesChanged.Add(fileChange);
+                commitDetail.FilesChanged.Add(fileChange);
+            }
         }
     }
 
     private static void AppendUnstagedChanges(Repository libgitRepository, GitCommitDetail commitDetail)
     {
+        var status = libgitRepository.RetrieveStatus();
         var changes = libgitRepository.Diff.Compare<TreeChanges>(libgitRepository.Head.Tip.Tree, DiffTargets.WorkingDirectory);
 
-        foreach (var change in changes)
+        foreach (var entry in status)
         {
-            var patch = libgitRepository.Diff.Compare<Patch>(libgitRepository.Head.Tip.Tree, DiffTargets.WorkingDirectory, new[] { change.Path });
-            var patchEntry = patch.FirstOrDefault(p => p.Path == change.Path);
+            if (entry.State.HasFlag(FileStatus.NewInWorkdir) ||
+                entry.State.HasFlag(FileStatus.ModifiedInWorkdir) ||
+                entry.State.HasFlag(FileStatus.DeletedFromWorkdir) ||
+                entry.State.HasFlag(FileStatus.RenamedInWorkdir) ||
+                entry.State.HasFlag(FileStatus.TypeChangeInWorkdir))
+            {
+                var change = changes.FirstOrDefault(c => c.Path == entry.FilePath);
+                var patch = libgitRepository.Diff.Compare<Patch>(libgitRepository.Head.Tip.Tree, DiffTargets.WorkingDirectory, new[] { entry.FilePath });
+                var patchEntry = patch.FirstOrDefault(p => p.Path == entry.FilePath);
 
-            var fileChange = new GitCommitFileChange();
-            fileChange.FilePath = change.Path;
-            fileChange.ChangeType = change.Status.ToString();
-            fileChange.Additions = patchEntry?.LinesAdded ?? 0;
-            fileChange.Deletions = patchEntry?.LinesDeleted ?? 0;
-            fileChange.DiffContent = patchEntry?.Patch ?? "";
-            fileChange.IsStaged = false;
+                var fileChange = new GitCommitFileChange();
+                fileChange.FilePath = entry.FilePath;
+                fileChange.ChangeType = change?.Status.ToString() ?? "";
+                fileChange.Additions = patchEntry?.LinesAdded ?? 0;
+                fileChange.Deletions = patchEntry?.LinesDeleted ?? 0;
+                fileChange.DiffContent = patchEntry?.Patch ?? "";
+                fileChange.IsStaged = false;
 
-            var blob = libgitRepository.Head.Tip.Tree[change.Path]?.Target.Id;
-            fileChange.FileContent = blob != null ? libgitRepository.Lookup<LibGit2Sharp.Blob>(blob)?.GetContentText() : "";
+                var blob = libgitRepository.Head.Tip.Tree[entry.FilePath]?.Target.Id;
+                fileChange.FileContent = blob != null ? libgitRepository.Lookup<LibGit2Sharp.Blob>(blob)?.GetContentText() : "";
 
-            commitDetail.FilesChanged.Add(fileChange);
+                commitDetail.FilesChanged.Add(fileChange);
+            }
         }
     }
 
@@ -238,5 +257,60 @@ public class GitRepositoryService : IGitRepositoryService
         var libgitRepository = new Repository(path);
         Commands.Unstage(libgitRepository, list);
         return Task.CompletedTask;
+    }
+
+    public async Task ValidateIfCommitIsPossibleAsync(string path, GitRepository currentRepository)
+    {
+        if (!currentRepository.CommitDetail.FilesChanged.Any(f => f.IsStaged))
+        {
+            throw new InvalidOperationException("No staged files to commit.");
+        }
+    }
+
+    public async Task<CommitRequest> GetCommitRequestAsync(string path, GitRepository currentRepository, string? message, string? description, UserProfile currentUserProfile)
+    {
+        if (string.IsNullOrEmpty(message))
+        {
+            throw new ArgumentException("Commit message cannot be empty.");
+        }
+        var commitRequest = new CommitRequest
+        {
+            Message = message,
+            Description = description ?? "",
+            Author = currentUserProfile.Username,
+            Email = currentUserProfile.Email
+        };
+        return commitRequest;
+    }
+
+    public Task CommitAsync(string path, GitRepository currentRepository, CommitRequest commitRequest)
+    {
+        var libgitRepository = new Repository(path);
+        var author = new Signature(commitRequest.Author, commitRequest.Email, DateTimeOffset.Now);
+        var message = commitRequest.Message + "\n\n" + commitRequest.Description;
+
+        Commit commit = libgitRepository.Commit(message, author, author);
+        return Task.CompletedTask;
+    }
+
+    public async Task PushAsync(string path, GitRepository currentRepository, UserProfile userProfile)
+    {
+        var libgitRepository = new Repository(path);
+        var currentBranch = currentRepository.LocalBranches.FirstOrDefault(b => b.IsCurrent);
+        if (currentBranch == null){
+            throw new InvalidOperationException("No current branch found to push.");
+        }
+
+        var options = new PushOptions
+        {
+            CredentialsProvider = (_url, _user, _cred) =>
+                new UsernamePasswordCredentials
+                {
+                    Username = userProfile.Username,
+                    Password = userProfile.Password
+                }
+        };
+
+        libgitRepository.Network.Push(libgitRepository.Branches[currentBranch.Name], options);
     }
 }

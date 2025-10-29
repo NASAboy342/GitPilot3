@@ -15,4 +15,8 @@ public interface IGitRepositoryService
     Task<GitCommitDetail> GetCommitDetailsAsync(string path, GitCommit commit);
     Task StageFilesAsync(string path, List<string> unstageFilePaths);
     Task UnStageFilesAsync(string path, List<string> list);
+    Task ValidateIfCommitIsPossibleAsync(string path, GitRepository currentRepository);
+    Task<CommitRequest> GetCommitRequestAsync(string path, GitRepository currentRepository, string? text, string? description, UserProfile currentUserProfile);
+    Task CommitAsync(string path, GitRepository currentRepository, CommitRequest commitRequest);
+    Task PushAsync(string path, GitRepository currentRepository, UserProfile userProfile);
 }

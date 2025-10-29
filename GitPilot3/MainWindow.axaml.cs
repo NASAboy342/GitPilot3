@@ -20,12 +20,14 @@ public partial class MainWindow : Window
     private readonly IGitRepositoryService _gitRepositoryService;
     public GitRepository CurrentRepository { get; set; } = new GitRepository();
     private readonly int _commitMessageRowHeight = 30;
+    private readonly IUserProfileService _userProfileService;
 
     public MainWindow()
     {
         InitializeComponent();
         _folderPicker = new FolderPicker(this); // Pass 'this' window as parent
         _gitRepositoryService = new GitRepositoryService();
+        _userProfileService = new UserProfileService();
         SetupWindow();
     }
 
@@ -99,7 +101,7 @@ public partial class MainWindow : Window
                     VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
                     Margin = new Avalonia.Thickness(5, 0, 5, 0),
                     CornerRadius = new Avalonia.CornerRadius(4),
-                    Background = new SolidColorBrush(commitBranch.ToAvaloniaColor()),
+                    Background = string.IsNullOrEmpty(commit.BranchName) ? new SolidColorBrush(Colors.Transparent) : new SolidColorBrush(commitBranch.ToAvaloniaColor()),
                     Child = new TextBlock
                     {
                         Text = commit.BranchName,
@@ -191,6 +193,7 @@ public partial class MainWindow : Window
         UpdateFileChangesHeaderView();
         UpdateFileChangesStackPanel();
         UpdateStagedFileChangesStackPanel();
+        SetStagedFileChangesVisibility(CurrentRepository.CommitDetail.Commit.IsWorkInProgress);
     }
 
     private void UpdateStagedFileChangesStackPanel()
@@ -281,15 +284,20 @@ public partial class MainWindow : Window
             fileChangeItem.Children.Add(unstageFileButton);
             fileChangeItem.Children.Add(fileInfo);
             stagedFileChangesStackPanel.Children.Add(fileChangeItem);
+        }
+    }
 
-            var fileChangesSplitter = this.FindControl<GridSplitter>("FileChangesSplitter");
-            var stagedFileChangesScrollViewer = this.FindControl<ScrollViewer>("StagedFileChangesScrollViewer");
+    private void SetStagedFileChangesVisibility(bool visible)
+    {
+        var fileChangesSplitter = this.FindControl<GridSplitter>("FileChangesSplitter");
+        var stagedFileChangesScrollViewer = this.FindControl<ScrollViewer>("StagedFileChangesScrollViewer");
+        var commitInputScrollViewer = this.FindControl<StackPanel>("CommitInputScrollViewer");
 
-            if (stagedFileChangesScrollViewer != null && fileChangesSplitter != null)
-            {
-                fileChangesSplitter.IsVisible = true;
-                stagedFileChangesScrollViewer.IsVisible = true;
-            }
+        if (stagedFileChangesScrollViewer != null && fileChangesSplitter != null && commitInputScrollViewer != null)
+        {
+            // fileChangesSplitter.IsVisible = visible;
+            stagedFileChangesScrollViewer.IsVisible = visible;
+            commitInputScrollViewer.IsVisible = visible;
         }
     }
 
@@ -298,7 +306,7 @@ public partial class MainWindow : Window
         if (CurrentRepository.CommitDetail.Commit.IsWorkInProgress)
         {
             await _gitRepositoryService.UnStageFilesAsync(CurrentRepository.Path, new List<string> { fileChange.FilePath });
-            UpdateFileChangesView();
+            await ShowCommitDetails(CurrentRepository.CommitDetail.Commit);
         }
     }
 
@@ -363,31 +371,31 @@ public partial class MainWindow : Window
                     }
             };
             DockPanel.SetDock(fileInfo, Dock.Left);
-
-            var stagedFileButton = new Button
-            {
-                Content = "+",
-                Foreground = Brushes.White,
-                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-                Height = 20,
-                Width = 20,
-                Padding = new Avalonia.Thickness(5, 0, 5, 0)
-            };
-            DockPanel.SetDock(stagedFileButton, Dock.Right);
-
-            stagedFileButton.Click += async (sender, e) =>
-            {
-                await StageFilesAsync(new List<string> { fileChange.FilePath });
-            };
-
             fileInfo.Tapped += async (sender, e) =>
             {
                 await ShowFileChangeDetail(fileChange);
             };
-
             fileChangeItem.Children.Add(fileInfo);
-            fileChangeItem.Children.Add(stagedFileButton);
+
+            if (CurrentRepository.CommitDetail.Commit.IsWorkInProgress)
+            {
+                var stagedFileButton = new Button
+                {
+                    Content = "+",
+                    Foreground = Brushes.White,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                    Height = 20,
+                    Width = 20,
+                    Padding = new Avalonia.Thickness(5, 0, 5, 0)
+                };
+                DockPanel.SetDock(stagedFileButton, Dock.Right);
+                stagedFileButton.Click += async (sender, e) =>
+                {
+                    await StageFilesAsync(new List<string> { fileChange.FilePath });
+                };
+                fileChangeItem.Children.Add(stagedFileButton);
+            }
 
             fileChangesStackPanel.Children.Add(fileChangeItem);
         }
@@ -398,7 +406,7 @@ public partial class MainWindow : Window
         if (CurrentRepository.CommitDetail.Commit.IsWorkInProgress)
         {
             await _gitRepositoryService.StageFilesAsync(CurrentRepository.Path, unstageFilePaths);
-            UpdateFileChangesView();
+            await ShowCommitDetails(CurrentRepository.CommitDetail.Commit);
         }
     }
 
@@ -736,14 +744,15 @@ public partial class MainWindow : Window
         // TODO: Implement fetch functionality
     }
 
-    private void OnPull(object sender, RoutedEventArgs e)
+    private async void OnPull(object sender, RoutedEventArgs e)
     {
-        // TODO: Implement pull functionality
+        
     }
 
-    private void OnPush(object sender, RoutedEventArgs e)
+    private async void OnPush(object sender, RoutedEventArgs e)
     {
-        // TODO: Implement push functionality
+        var userProfile = await _userProfileService.GetCurrentUserProfileAsync();
+        await _gitRepositoryService.PushAsync(CurrentRepository.Path, CurrentRepository, userProfile);
     }
 
     private void OnCreateBranch(object sender, RoutedEventArgs e)
@@ -754,5 +763,29 @@ public partial class MainWindow : Window
     private void OnRefresh(object sender, RoutedEventArgs e)
     {
         // TODO: Implement refresh repository state
+    }
+    private async void OnCommitButtonClick(object sender, RoutedEventArgs e)
+    {
+        if (CurrentRepository.CommitDetail != null && CurrentRepository.CommitDetail.Commit.IsWorkInProgress)
+        {
+            var commitMessageTextBox = this.FindControl<TextBox>("CommitMessageTextBox");
+            var commitDescriptionTextBox = this.FindControl<TextBox>("CommitDescriptionTextBox");
+            if (commitMessageTextBox == null || commitDescriptionTextBox == null)
+            {
+                return;
+            }
+            await _gitRepositoryService.ValidateIfCommitIsPossibleAsync(CurrentRepository.Path, CurrentRepository);
+            var currentUserProfile = await _userProfileService.GetCurrentUserProfileAsync();
+            var commitRequest = await _gitRepositoryService.GetCommitRequestAsync(CurrentRepository.Path, CurrentRepository, commitMessageTextBox.Text, commitDescriptionTextBox.Text, currentUserProfile);
+            await _gitRepositoryService.CommitAsync(CurrentRepository.Path, CurrentRepository, commitRequest);
+            CurrentRepository.Commits = await _gitRepositoryService.GetCommitsAsync(CurrentRepository.Path);
+            UpdateCurrentRepositoryDisplay();
+            await ShowCommitDetails(CurrentRepository.CommitDetail.Commit);
+        }
+    }
+    private void OnOpenProfile(object sender, RoutedEventArgs e)
+    {
+        var profileWindow = new ProfileManagementWindow();
+        profileWindow.ShowDialog(this);
     }
 }

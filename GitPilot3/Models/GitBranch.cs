@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using Avalonia.Controls.Primitives;
 using Avalonia.Media;
 
 namespace GitPilot3.Models;
@@ -14,7 +16,7 @@ public class GitBranch
 
     internal Color ToAvaloniaColor()
     {
-        return new Color((byte)Color.R, (byte)Color.G, (byte)Color.B, (byte)255);
+        return new Color((byte)255, (byte)Color.R, (byte)Color.G, (byte)Color.B);
     }
 
     public class RGBColor
@@ -36,14 +38,28 @@ public class GitBranch
 
         public RGBColor GetRandomColor()
         {
-            Random rand = new Random();
+            var colorsTemplate = new List<RGBColor>
+            {
+                new RGBColor(174, 2, 37),
+                new RGBColor(159, 52, 5),
+                new RGBColor(42, 52, 149),
+                new RGBColor(1, 107, 49),
+                new RGBColor(165, 16, 20),
+                new RGBColor(125, 6, 121),
+                new RGBColor(83, 39, 139),
+                new RGBColor(155, 0, 65),
+                new RGBColor(3, 106, 92),
+                new RGBColor(2, 89, 140),
+                new RGBColor(178, 1, 1),
+                new RGBColor(159, 52, 5),
+            };
 
-            var oneToThree = rand.Next(1, 4);
+            var random = new Random();
 
-            R = rand.Next(oneToThree == 1 ? 200 : 0, 256);
-            G = rand.Next(oneToThree == 2 ? 200 : 0, 256);
-            B = rand.Next(oneToThree == 3 ? 200 : 0, 256);
-            return this;
+            var randomIndex = random.Next(0, colorsTemplate.Count);
+
+            var resultColor = colorsTemplate[randomIndex];
+            return resultColor;
         }
     }
 }

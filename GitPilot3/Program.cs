@@ -1,5 +1,9 @@
 ﻿using Avalonia;
+using Microsoft.Extensions.DependencyInjection;
+using GitPilot3.Services;
 using System;
+using GitPilot3.Repositories;
+using GitPilot3.UserControlles;
 
 namespace GitPilot3;
 
@@ -14,8 +18,34 @@ class Program
 
     // Avalonia configuration, don't remove; also used by visual designer.
     public static AppBuilder BuildAvaloniaApp()
-        => AppBuilder.Configure<App>()
+    {
+        // Create service collection
+        var services = new ServiceCollection();
+        ConfigureServices(services);
+        
+        // Build service provider
+        var serviceProvider = services.BuildServiceProvider();
+
+        return AppBuilder.Configure(() => new App(serviceProvider))
             .UsePlatformDetect()
             .WithInterFont()
             .LogToTrace();
+    }
+
+    private static void ConfigureServices(IServiceCollection services)
+    {
+        // Register your services here
+        services.AddSingleton<IGitRepositoryService, GitRepositoryService>();
+        services.AddSingleton<IUserProfileService, UserProfileService>();
+        services.AddSingleton<IAppRepository, AppRepository>();
+        services.AddSingleton<IAppStageService, AppStageService>();
+        services.AddSingleton<ErrorMessageHandler, ErrorMessageHandler>();
+
+        services.AddTransient<MainWindow>();
+        services.AddTransient<ProfileManagementWindow>();
+        services.AddTransient<ProfileMenagement>();
+        services.AddTransient<AddAccount>();
+        services.AddTransient<EditAccount>();
+        // Add more services as needed when you create them
+    }
 }

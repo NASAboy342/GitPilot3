@@ -18,13 +18,15 @@ public class GitRepositoryService : IGitRepositoryService
         {
             if (branch.IsRemote)
             {
+                var fallBehind = branch.TrackingDetails.BehindBy ?? 0;
+                var ahead = branch.TrackingDetails.AheadBy ?? 0;
                 remoteBranches.Add(new GitBranch
                 {
                     IsRemote = true,
                     Name = branch.FriendlyName,
-                    InComming = 0, // Placeholder for actual logic
-                    OutGoing = 0,  // Placeholder for actual logic
-                    Color = new GitBranch.RGBColor().GetRandomColor()
+                    InComming = fallBehind,
+                    OutGoing = ahead,
+                    Color = new RGBColor().GetRandomColor()
                 });
             }
         }
@@ -39,14 +41,16 @@ public class GitRepositoryService : IGitRepositoryService
         {
             if (!branch.IsRemote)
             {
+                var fallBehind = branch.TrackingDetails.BehindBy ?? 0;
+                var ahead = branch.TrackingDetails.AheadBy ?? 0;
                 localBranches.Add(new GitBranch
                 {
                     IsRemote = false,
                     Name = branch.FriendlyName,
                     IsCurrent = branch.IsCurrentRepositoryHead,
-                    InComming = 0, // Placeholder for actual logic
-                    OutGoing = 0,  // Placeholder for actual logic
-                    Color = new GitBranch.RGBColor().GetRandomColor()
+                    InComming = fallBehind,
+                    OutGoing = ahead,
+                    Color = new RGBColor().GetRandomColor()
                 });
             }
         }
@@ -82,7 +86,7 @@ public class GitRepositoryService : IGitRepositoryService
         var libgitRepository = new Repository(currentRepository.Path);
         var branch = libgitRepository.Branches[name];
         if (branch == null)
-            return;
+            throw new Exception($"Branch '{name}' not found.");
         Commands.Checkout(libgitRepository, branch);
     }
 
@@ -312,5 +316,46 @@ public class GitRepositoryService : IGitRepositoryService
         };
 
         libgitRepository.Network.Push(libgitRepository.Branches[currentBranch.Name], options);
+    }
+
+    public async Task FetchAsync(string path, UserProfile currentUserProfile)
+    {
+        var libgitRepository = new Repository(path);
+        Commands.Fetch(libgitRepository, libgitRepository.Network.Remotes.First().Name, new string[0], new FetchOptions{
+            CredentialsProvider = (_url, _user, _cred) =>
+                new UsernamePasswordCredentials
+                {
+                    Username = currentUserProfile.Username,
+                    Password = currentUserProfile.Password
+                }
+        }, null);
+    }
+
+    public async Task PullAsync(UserProfile currentUserProfile, GitRepository currentRepository)
+    {
+        var libgitRepository = new Repository(currentRepository.Path);
+        var originName = libgitRepository.Network.Remotes.First().Name;
+        var branch = currentRepository.LocalBranches.FirstOrDefault(b => b.IsCurrent)?.Name ?? "";
+        if (string.IsNullOrEmpty(branch))
+            throw new Exception("No current branch found to pull.");
+
+        var remoteBranch = libgitRepository.Branches[$"{originName}/{branch}"];
+        var signature = new Signature(currentUserProfile.Username, currentUserProfile.Email, DateTimeOffset.Now);
+        libgitRepository.Merge(remoteBranch, signature);
+    }
+
+    public async Task CreateNewLocalBranchFromRemoteAsync(string path, string originBranchName)
+    {
+        var libgitRepository = new Repository(path);
+        var origin = libgitRepository.Network.Remotes.First().Name;
+        var remoteBranch = libgitRepository.Branches[$"{originBranchName}"];
+        if (remoteBranch == null)
+            throw new Exception($"Remote branch '{originBranchName}' not found.");
+        // ex name "origin/feature/logo-redesign"
+        var splited = remoteBranch.FriendlyName.Split('/').ToList();
+        splited.RemoveAt(0); // remove "origin"
+        var localBranchName = string.Join('/', splited);
+        var localBranch = libgitRepository.CreateBranch(localBranchName, remoteBranch.Tip);
+        libgitRepository.Branches.Update(localBranch, b => b.TrackedBranch = remoteBranch.CanonicalName);
     }
 }

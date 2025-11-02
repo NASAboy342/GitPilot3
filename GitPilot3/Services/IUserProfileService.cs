@@ -7,6 +7,9 @@ namespace GitPilot3.Services;
 
 public interface IUserProfileService
 {
+    Task AddUserProfile(UserProfile newProfile);
     Task<List<UserProfile>> GetAllUserProfilesAsync();
     Task<UserProfile> GetCurrentUserProfileAsync();
+    Task SwitchActiveProfile(UserProfile selectedProfile);
+    Task UpdateCurrentUserProfile(UserProfile editingProfile);
 }

@@ -8,15 +8,19 @@
     <Grid.RowDefinitions>
       <RowDefinition Height="*"/>
       <RowDefinition Height="50"/>
+      <RowDefinition Height="50"/>
     </Grid.RowDefinitions>
     <StackPanel Grid.Row="0" Margin="10" Spacing="20">
       <ComboBox x:Name="ProfileComboBox" Height="50" HorizontalAlignment="Stretch">
       </ComboBox>
       <TextBlock Text="Authoring commits as:" FontWeight="Bold" FontSize="20"/>
-      <TextBlock x:Name="NameTextBlock" Text="Name: John Doe"/>
-      <TextBlock x:Name="EmailTextBlock" Text="Email: john.doe@example.com"/>
+      <TextBlock x:Name="NameTextBlock" Text="Name: "/>
+      <TextBlock x:Name="EmailTextBlock" Text="Email: "/>
     </StackPanel>
-    <Button Grid.Row="1" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Margin="10, 10">
+    <Button Grid.Row="1" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Margin="10, 10" Click="OnClickEditAccount">
+      <TextBlock Text="Edit" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+    </Button>
+    <Button Grid.Row="2" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Margin="10, 10" Click="OnClickAddAccount">
       <TextBlock Text="Add Account" HorizontalAlignment="Center" VerticalAlignment="Center"/>
     </Button>
   </Grid>

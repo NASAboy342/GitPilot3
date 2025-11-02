@@ -3,7 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
-             x:Class="GitPilot3.UserControlles.AddAccount">
+             x:Class="GitPilot3.UserControlles.EditAccount">
   <Grid>
     <Grid.RowDefinitions>
       <RowDefinition Height="*"/>
@@ -14,7 +14,7 @@
       <TextBlock Text="Add New Account" FontWeight="Bold" FontSize="24"/>
       <TextBox x:Name="UsernameTextBox" Watermark="Username" Height="40" HorizontalAlignment="Stretch"/>
       <TextBox x:Name="EmailTextBox" Watermark="Email" Height="40" HorizontalAlignment="Stretch"/>
-      <TextBox x:Name="TokenTextBox" Watermark="Personal Access Token (Github) / Password" Height="40" HorizontalAlignment="Stretch"/>
+      <TextBox x:Name="TokenTextBox" Watermark="Personal Access Token / Password" Height="40" HorizontalAlignment="Stretch"/>
     </StackPanel>
 
 
@@ -22,8 +22,8 @@
       <Button Width="100" Height="30" Click="OnClickCancel">
         <TextBlock Text="Cancel" HorizontalAlignment="Center" VerticalAlignment="Center"/>
       </Button>
-      <Button Width="100" Height="30" Click="OnClickAddAccount">
-        <TextBlock Text="Add" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+      <Button Width="100" Height="30" Click="OnClickSaveEditAccount">
+        <TextBlock Text="Save" HorizontalAlignment="Center" VerticalAlignment="Center"/>
       </Button>
     </StackPanel>
   </Grid>

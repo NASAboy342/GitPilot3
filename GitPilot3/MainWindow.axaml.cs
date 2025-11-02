@@ -11,6 +11,8 @@ using System.Threading.Tasks;
 using AvaloniaEdit;
 using System.Collections.Generic;
 using LibGit2Sharp;
+using GitPilot3.UserControlles;
+using Avalonia.Controls.Documents;
 
 namespace GitPilot3;
 
@@ -21,29 +23,212 @@ public partial class MainWindow : Window
     public GitRepository CurrentRepository { get; set; } = new GitRepository();
     private readonly int _commitMessageRowHeight = 30;
     private readonly IUserProfileService _userProfileService;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly IAppStageService _appStageService;
+    private readonly ErrorMessageHandler _errorMessageHandler;
 
-    public MainWindow()
+    public MainWindow(IUserProfileService userProfileService,
+    IGitRepositoryService gitRepositoryService,
+    IServiceProvider serviceProvider,
+    IAppStageService appStageService,
+    ErrorMessageHandler errorMessageHandler)
     {
+        _userProfileService = userProfileService;
+        _gitRepositoryService = gitRepositoryService;
+        _serviceProvider = serviceProvider;
+        _appStageService = appStageService;
+        _errorMessageHandler = errorMessageHandler;
+        _folderPicker = new FolderPicker(this);
         InitializeComponent();
-        _folderPicker = new FolderPicker(this); // Pass 'this' window as parent
-        _gitRepositoryService = new GitRepositoryService();
-        _userProfileService = new UserProfileService();
         SetupWindow();
+        _errorMessageHandler.ErrorMessageShown += (s, e) => AddErrorCard(e);
+        _errorMessageHandler.SuccessMessageShown += (s, e) => AddSuccessCard(e);
+        StartScheduleRefreshCurrentRepository();
+    }
+
+    private async Task StartScheduleRefreshCurrentRepository()
+    {
+        try
+        {
+            if (CurrentRepository == null || string.IsNullOrEmpty(CurrentRepository.Path))
+            {
+                await Task.Delay(TimeSpan.FromSeconds(20));
+                StartScheduleRefreshCurrentRepository();
+                return;
+            }
+            await SyncRepository();
+        }
+        catch (Exception ex)
+        {
+            _errorMessageHandler.ShowErrorMessage("Failed to refresh repository: " + ex.Message);
+        }
+        await Task.Delay(TimeSpan.FromSeconds(10));
+        StartScheduleRefreshCurrentRepository();
+    }
+
+    private async Task SyncRepository()
+    {
+        if (CurrentRepository == null || string.IsNullOrEmpty(CurrentRepository.Path))
+            throw new InvalidOperationException("No repository is currently loaded.");
+        var localBranches = await _gitRepositoryService.GetLocalBranchesAsync(CurrentRepository.Path);
+        UpdateLocalBranches(localBranches);
+        var remoteBranches = await _gitRepositoryService.GetRemoteBranchesAsync(CurrentRepository.Path);
+        UpdateRemoteBranches(remoteBranches);
+        CurrentRepository.Commits = await _gitRepositoryService.GetCommitsAsync(CurrentRepository.Path);
+        UpdateCurrentRepositoryDisplay();
+        if (CurrentRepository.CommitDetail != null && !string.IsNullOrEmpty(CurrentRepository.CommitDetail.Commit.Sha))
+        {
+            CurrentRepository.CommitDetail = await _gitRepositoryService.GetCommitDetailsAsync(CurrentRepository.Path, CurrentRepository.CommitDetail.Commit);
+            UpdateFileChangesView();
+        }
+        _appStageService.SaveCurrentRepository(CurrentRepository);
+    }
+
+    private void UpdateRemoteBranches(List<GitBranch> remoteBranches)
+    {
+        foreach (var updatedBranch in remoteBranches)
+        {
+            var existingBranch = CurrentRepository.RemoteBranches.FirstOrDefault(b => b.Name == updatedBranch.Name);
+            if (existingBranch != null)
+            {
+                existingBranch.InComming = updatedBranch.InComming;
+                existingBranch.OutGoing = updatedBranch.OutGoing;
+            }
+            else
+            {
+                CurrentRepository.RemoteBranches.Add(updatedBranch);
+            }
+        }
+        foreach (var existingBranch in CurrentRepository.RemoteBranches.ToList())
+        {
+            if (!remoteBranches.Any(b => b.Name == existingBranch.Name))
+            {
+                CurrentRepository.RemoteBranches.Remove(existingBranch);
+            }
+        }
+    }
+
+    private void UpdateLocalBranches(List<GitBranch> newLocalBranchesData)
+    {
+        foreach (var updatedBranch in newLocalBranchesData)
+        {
+            var existingBranch = CurrentRepository.LocalBranches.FirstOrDefault(b => b.Name == updatedBranch.Name);
+            if (existingBranch != null)
+            {
+                existingBranch.InComming = updatedBranch.InComming;
+                existingBranch.OutGoing = updatedBranch.OutGoing;
+            }
+            else
+            {
+                CurrentRepository.LocalBranches.Add(updatedBranch);
+            }
+        }
+        foreach (var existingBranch in CurrentRepository.LocalBranches.ToList())
+        {
+            if (!newLocalBranchesData.Any(b => b.Name == existingBranch.Name))
+            {
+                CurrentRepository.LocalBranches.Remove(existingBranch);
+            }
+        }
     }
 
     private void SetupWindow()
     {
-        // Set the window icon and initial state
         this.WindowState = WindowState.Maximized;
 
-        // You can add initial repository loading logic here
-        LoadDefaultRepository();
+        LoadProfileInfoDisplay();
+        LoadLastOpentedRepository();
     }
 
-    private void LoadDefaultRepository()
+    private void AddSuccessCard(string message)
     {
-        // Placeholder for loading the current directory as a git repository
-        // This will be expanded when implementing actual Git functionality
+        var errorStackPanel = this.FindControl<StackPanel>("ErrorStackPanel");
+        if (errorStackPanel == null)
+            return;
+
+        var successCard = new SuccessCard(message);
+        successCard.CloseSuccessCardClicked += (s, e) =>
+        {
+            errorStackPanel.Children.Remove(successCard);
+        };
+        errorStackPanel.Children.Add(successCard);
+    }
+
+    private void AddErrorCard(string message)
+    {
+        var errorStackPanel = this.FindControl<StackPanel>("ErrorStackPanel");
+        if (errorStackPanel == null)
+            return;
+
+        var errorCard = new ErrorCard(message);
+        errorCard.CloseErrorCardClicked += (s, e) =>
+        {
+            errorStackPanel.Children.Remove(errorCard);
+        };
+        errorStackPanel.Children.Add(errorCard);
+    }
+    private void LoadLastOpentedRepository()
+    {
+        try
+        {
+            var lastRepository = _appStageService.GetCurrentRepository();
+            if (lastRepository == null)
+                return;
+            CurrentRepository = lastRepository;
+            UpdateCurrentRepositoryDisplay();
+        }
+        catch (Exception ex)
+        {
+            AddErrorCard(ex.Message);
+        }
+    }
+
+    private async Task LoadProfileInfoDisplay()
+    {
+        try
+        {
+            var profileButton = this.FindControl<Button>("ProfileButton");
+            if (profileButton == null)
+                return;
+            var currentProfile = await _userProfileService.GetCurrentUserProfileAsync();
+            if (currentProfile == null)
+                return;
+            var stackPanel = new StackPanel
+            {
+                Orientation = Avalonia.Layout.Orientation.Horizontal,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                Spacing = 10
+            };
+            var profileIcon = new Border
+            {
+                Width = 24,
+                Height = 24,
+                Background = new Avalonia.Media.SolidColorBrush(currentProfile.ToAvaloniaColor()),
+                CornerRadius = new Avalonia.CornerRadius(12),
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            };
+            var profileIconLetter = new TextBlock
+            {
+                Text = currentProfile.Username.Length > 0 ? currentProfile.Username[0].ToString().ToUpper() : "?",
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                Foreground = Avalonia.Media.Brushes.White
+            };
+            profileIcon.Child = profileIconLetter;
+            stackPanel.Children.Add(profileIcon);
+            var username = new TextBlock
+            {
+                Text = currentProfile.Username,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            };
+            stackPanel.Children.Add(username);
+            profileButton.Content = stackPanel;
+        }
+        catch (Exception ex)
+        {
+            AddErrorCard(ex.Message);
+        }
     }
 
     // Event handlers for menu items and toolbar buttons
@@ -54,14 +239,23 @@ public partial class MainWindow : Window
 
     private async void OnOpenRepository(object sender, RoutedEventArgs e)
     {
-        var repositoryPath = await _folderPicker.ShowDialogAsync();
-        if (string.IsNullOrEmpty(repositoryPath))
-            return;
-        CurrentRepository = await _gitRepositoryService.LoadRepositoryAsync(repositoryPath);
-        CurrentRepository.RemoteBranches = await _gitRepositoryService.GetRemoteBranchesAsync(repositoryPath);
-        CurrentRepository.LocalBranches = await _gitRepositoryService.GetLocalBranchesAsync(repositoryPath);
-        CurrentRepository.Commits = await _gitRepositoryService.GetCommitsAsync(repositoryPath);
-        UpdateCurrentRepositoryDisplay();
+        try
+        {
+            var repositoryPath = await _folderPicker.ShowDialogAsync();
+            if (string.IsNullOrEmpty(repositoryPath))
+                return;
+            CurrentRepository = await _gitRepositoryService.LoadRepositoryAsync(repositoryPath);
+            CurrentRepository.RemoteBranches = await _gitRepositoryService.GetRemoteBranchesAsync(repositoryPath);
+            CurrentRepository.LocalBranches = await _gitRepositoryService.GetLocalBranchesAsync(repositoryPath);
+            CurrentRepository.Commits = await _gitRepositoryService.GetCommitsAsync(repositoryPath);
+            UpdateCurrentRepositoryDisplay();
+            _appStageService.SaveCurrentRepository(CurrentRepository);
+            AddSuccessCard($"Repository: {CurrentRepository.Name} loaded successfully.");
+        }
+        catch (Exception ex)
+        {
+            AddErrorCard(ex.Message);
+        }
     }
 
     private void UpdateCurrentRepositoryDisplay()
@@ -681,10 +875,26 @@ public partial class MainWindow : Window
 
     private async Task OnRemoteBranchDoubleClicked(string name)
     {
-        await _gitRepositoryService.CheckoutBranchAsync(CurrentRepository, name);
-        CurrentRepository.LocalBranches = await _gitRepositoryService.GetLocalBranchesAsync(CurrentRepository.Path);
-        UpdateLocalBranchesTreeView();
-        UpdateCurrentBranchNameDisplay();
+        try
+        {
+            var currentUserProfile = await _userProfileService.GetCurrentUserProfileAsync();
+            await _gitRepositoryService.FetchAsync(CurrentRepository.Path, currentUserProfile);
+            await SyncRepository();
+            await _gitRepositoryService.CreateNewLocalBranchFromRemoteAsync(CurrentRepository.Path, name);
+            var splitedName = name.Split('/').ToList();
+            splitedName.RemoveAt(0);
+            var localBranchName = string.Join('/', splitedName);
+            await _gitRepositoryService.CheckoutBranchAsync(CurrentRepository, localBranchName);
+            CurrentRepository.LocalBranches = await _gitRepositoryService.GetLocalBranchesAsync(CurrentRepository.Path);
+            UpdateLocalBranchesTreeView();
+            UpdateCurrentBranchNameDisplay();
+            AddSuccessCard($"Created and switched to branch: {localBranchName} successfully.");
+        }
+        catch (Exception ex)
+        {
+            AddErrorCard(ex.Message);
+            return;
+        }
     }
 
     private void UpdateLocalBranchesTreeView()
@@ -697,9 +907,19 @@ public partial class MainWindow : Window
         {
             var newItem = new TreeViewItem
             {
-                Header = branch.Name,
                 IsSelected = false
             };
+            var textBlock = new TextBlock
+            {
+                Inlines = {
+                    new Run{ Text = branch.Name },
+                    new Run{ Text = branch.InComming > 0 ? $"  ⇃{branch.InComming}" : "", Foreground = Brushes.Green, FontSize = 12 },
+                    new Run{ Text = branch.OutGoing > 0 ? $"  ↾{branch.OutGoing}" : "", Foreground = Brushes.Red, FontSize = 12 }
+                },
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            };
+
+            newItem.Header = textBlock;
 
             newItem.DoubleTapped += async (sender, e) =>
             {
@@ -718,10 +938,20 @@ public partial class MainWindow : Window
 
     private async Task OnLocalBranchDoubleClicked(string name)
     {
-        await _gitRepositoryService.CheckoutBranchAsync(CurrentRepository, name);
-        CurrentRepository.LocalBranches = await _gitRepositoryService.GetLocalBranchesAsync(CurrentRepository.Path);
-        UpdateLocalBranchesTreeView();
-        UpdateCurrentBranchNameDisplay();
+        try
+        {
+            await _gitRepositoryService.CheckoutBranchAsync(CurrentRepository, name);
+            CurrentRepository.LocalBranches = await _gitRepositoryService.GetLocalBranchesAsync(CurrentRepository.Path);
+            UpdateLocalBranchesTreeView();
+            UpdateCurrentBranchNameDisplay();
+            AddSuccessCard($"Switched to branch: {name} successfully.");
+        }
+        catch (Exception ex)
+        {
+            AddErrorCard(ex.Message);
+            return;
+        }
+
     }
 
     private static StackPanel AddGreenDot()
@@ -739,20 +969,56 @@ public partial class MainWindow : Window
         return stackPanel;
     }
 
-    private void OnFetch(object sender, RoutedEventArgs e)
+    private async void OnFetch(object sender, RoutedEventArgs e)
     {
-        // TODO: Implement fetch functionality
+        try
+        {
+            var currentUserProfile = await _userProfileService.GetCurrentUserProfileAsync();
+            await _gitRepositoryService.FetchAsync(CurrentRepository.Path, currentUserProfile);
+            await SyncRepository();
+            AddSuccessCard("Fetched latest changes from remote repository successfully.");
+        }
+        catch (Exception ex)
+        {
+            AddErrorCard(ex.Message);
+            return;
+        }
     }
 
     private async void OnPull(object sender, RoutedEventArgs e)
     {
-        
+        try
+        {
+            if (string.IsNullOrEmpty(CurrentRepository.Name))
+                throw new Exception("No repository is currently loaded.");
+            await _gitRepositoryService.CheckoutBranchAsync(CurrentRepository, CurrentRepository.LocalBranches.FirstOrDefault(b => b.IsCurrent)?.Name ?? "");
+            var currentUserProfile = await _userProfileService.GetCurrentUserProfileAsync();
+            await _gitRepositoryService.FetchAsync(CurrentRepository.Path, currentUserProfile);
+            await _gitRepositoryService.PullAsync(currentUserProfile, CurrentRepository);
+            await SyncRepository();
+            AddSuccessCard("Pulled latest changes from remote repository successfully.");
+        }
+        catch (Exception ex)
+        {
+            AddErrorCard(ex.Message);
+            return;
+        }
     }
 
     private async void OnPush(object sender, RoutedEventArgs e)
     {
-        var userProfile = await _userProfileService.GetCurrentUserProfileAsync();
-        await _gitRepositoryService.PushAsync(CurrentRepository.Path, CurrentRepository, userProfile);
+        try
+        {
+            var userProfile = await _userProfileService.GetCurrentUserProfileAsync();
+            await _gitRepositoryService.PushAsync(CurrentRepository.Path, CurrentRepository, userProfile);
+            await SyncRepository();
+            AddSuccessCard("Changes pushed to remote repository successfully.");
+        }
+        catch (Exception ex)
+        {
+            AddErrorCard(ex.Message);
+            return;
+        }
     }
 
     private void OnCreateBranch(object sender, RoutedEventArgs e)
@@ -766,26 +1032,47 @@ public partial class MainWindow : Window
     }
     private async void OnCommitButtonClick(object sender, RoutedEventArgs e)
     {
-        if (CurrentRepository.CommitDetail != null && CurrentRepository.CommitDetail.Commit.IsWorkInProgress)
+        try
         {
-            var commitMessageTextBox = this.FindControl<TextBox>("CommitMessageTextBox");
-            var commitDescriptionTextBox = this.FindControl<TextBox>("CommitDescriptionTextBox");
-            if (commitMessageTextBox == null || commitDescriptionTextBox == null)
+            if (CurrentRepository.CommitDetail != null && CurrentRepository.CommitDetail.Commit.IsWorkInProgress)
             {
-                return;
+                var commitMessageTextBox = this.FindControl<TextBox>("CommitMessageTextBox");
+                var commitDescriptionTextBox = this.FindControl<TextBox>("CommitDescriptionTextBox");
+                if (commitMessageTextBox == null || commitDescriptionTextBox == null)
+                {
+                    return;
+                }
+                await _gitRepositoryService.ValidateIfCommitIsPossibleAsync(CurrentRepository.Path, CurrentRepository);
+                var currentUserProfile = await _userProfileService.GetCurrentUserProfileAsync();
+                var commitRequest = await _gitRepositoryService.GetCommitRequestAsync(CurrentRepository.Path, CurrentRepository, commitMessageTextBox.Text, commitDescriptionTextBox.Text, currentUserProfile);
+                await _gitRepositoryService.CommitAsync(CurrentRepository.Path, CurrentRepository, commitRequest);
+                CurrentRepository.Commits = await _gitRepositoryService.GetCommitsAsync(CurrentRepository.Path);
+                CurrentRepository.RemoteBranches = await _gitRepositoryService.GetRemoteBranchesAsync(CurrentRepository.Path);
+                CurrentRepository.LocalBranches = await _gitRepositoryService.GetLocalBranchesAsync(CurrentRepository.Path);
+                UpdateCurrentRepositoryDisplay();
+                await ShowCommitDetails(CurrentRepository.CommitDetail.Commit);
+                AddSuccessCard("Changes committed successfully.");
             }
-            await _gitRepositoryService.ValidateIfCommitIsPossibleAsync(CurrentRepository.Path, CurrentRepository);
-            var currentUserProfile = await _userProfileService.GetCurrentUserProfileAsync();
-            var commitRequest = await _gitRepositoryService.GetCommitRequestAsync(CurrentRepository.Path, CurrentRepository, commitMessageTextBox.Text, commitDescriptionTextBox.Text, currentUserProfile);
-            await _gitRepositoryService.CommitAsync(CurrentRepository.Path, CurrentRepository, commitRequest);
-            CurrentRepository.Commits = await _gitRepositoryService.GetCommitsAsync(CurrentRepository.Path);
-            UpdateCurrentRepositoryDisplay();
-            await ShowCommitDetails(CurrentRepository.CommitDetail.Commit);
+            else
+            {
+                AddErrorCard("No changes to commit.");
+            }
+        }
+        catch (Exception ex)
+        {
+            AddErrorCard(ex.Message);
         }
     }
     private void OnOpenProfile(object sender, RoutedEventArgs e)
     {
-        var profileWindow = new ProfileManagementWindow();
-        profileWindow.ShowDialog(this);
+        var profileWindow = _serviceProvider.GetService(typeof(ProfileManagementWindow)) as ProfileManagementWindow;
+        if (profileWindow != null)
+        {
+            profileWindow.ShowDialog(this);
+            profileWindow.Closed += async (s, args) =>
+            {
+                await LoadProfileInfoDisplay();
+            };
+        }
     }
 }

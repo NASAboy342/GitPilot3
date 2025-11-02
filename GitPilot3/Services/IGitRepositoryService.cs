@@ -19,4 +19,7 @@ public interface IGitRepositoryService
     Task<CommitRequest> GetCommitRequestAsync(string path, GitRepository currentRepository, string? text, string? description, UserProfile currentUserProfile);
     Task CommitAsync(string path, GitRepository currentRepository, CommitRequest commitRequest);
     Task PushAsync(string path, GitRepository currentRepository, UserProfile userProfile);
+    Task FetchAsync(string path, UserProfile currentUserProfile);
+    Task PullAsync(UserProfile currentUserProfile, GitRepository currentRepository);
+    Task CreateNewLocalBranchFromRemoteAsync(string path, string name);
 }

@@ -13,6 +13,9 @@ using System.Collections.Generic;
 using LibGit2Sharp;
 using GitPilot3.UserControlles;
 using Avalonia.Controls.Documents;
+using System.Runtime.InteropServices;
+using System.IO;
+using Avalonia.Threading;
 
 namespace GitPilot3;
 
@@ -26,44 +29,68 @@ public partial class MainWindow : Window
     private readonly IServiceProvider _serviceProvider;
     private readonly IAppStageService _appStageService;
     private readonly ErrorMessageHandler _errorMessageHandler;
+    private FileSystemWatcher? _fileSystemWatcher;
+    private LocalbrancheFlyout _localbrancheFlyout;
 
     public MainWindow(IUserProfileService userProfileService,
     IGitRepositoryService gitRepositoryService,
     IServiceProvider serviceProvider,
     IAppStageService appStageService,
-    ErrorMessageHandler errorMessageHandler)
+    ErrorMessageHandler errorMessageHandler,
+    LocalbrancheFlyout localbrancheFlyout)
     {
         _userProfileService = userProfileService;
         _gitRepositoryService = gitRepositoryService;
         _serviceProvider = serviceProvider;
         _appStageService = appStageService;
         _errorMessageHandler = errorMessageHandler;
+        _localbrancheFlyout = localbrancheFlyout;
         _folderPicker = new FolderPicker(this);
         InitializeComponent();
         SetupWindow();
         _errorMessageHandler.ErrorMessageShown += (s, e) => AddErrorCard(e);
         _errorMessageHandler.SuccessMessageShown += (s, e) => AddSuccessCard(e);
-        StartScheduleRefreshCurrentRepository();
+        InitializeGitWatcher();
     }
 
-    private async Task StartScheduleRefreshCurrentRepository()
+    private async Task InitializeGitWatcher()
+    {
+        try
+        {
+            if (String.IsNullOrEmpty(CurrentRepository.Path))
+                return;
+            _fileSystemWatcher?.Dispose();
+            _fileSystemWatcher = new FileSystemWatcher
+            {
+                Path = CurrentRepository.Path,
+                NotifyFilter = NotifyFilters.LastWrite,
+                EnableRaisingEvents = true
+            };
+            _fileSystemWatcher.Changed += async (s, e) =>
+            {
+                await Dispatcher.UIThread.InvokeAsync(async () => await OnRepositoryChanged());
+            };
+        }
+        catch (Exception ex)
+        {
+            AddErrorCard("Failed to initialize Git watcher: " + ex.Message);
+        }
+    }
+    private async Task OnRepositoryChanged()
     {
         try
         {
             if (CurrentRepository == null || string.IsNullOrEmpty(CurrentRepository.Path))
             {
-                await Task.Delay(TimeSpan.FromSeconds(20));
-                StartScheduleRefreshCurrentRepository();
                 return;
             }
+            await Task.Delay(TimeSpan.FromSeconds(5));
             await SyncRepository();
         }
         catch (Exception ex)
         {
             _errorMessageHandler.ShowErrorMessage("Failed to refresh repository: " + ex.Message);
         }
-        await Task.Delay(TimeSpan.FromSeconds(10));
-        StartScheduleRefreshCurrentRepository();
     }
 
     private async Task SyncRepository()
@@ -250,6 +277,7 @@ public partial class MainWindow : Window
             CurrentRepository.Commits = await _gitRepositoryService.GetCommitsAsync(repositoryPath);
             UpdateCurrentRepositoryDisplay();
             _appStageService.SaveCurrentRepository(CurrentRepository);
+            InitializeGitWatcher();
             AddSuccessCard($"Repository: {CurrentRepository.Name} loaded successfully.");
         }
         catch (Exception ex)
@@ -907,14 +935,14 @@ public partial class MainWindow : Window
         {
             var newItem = new TreeViewItem
             {
-                IsSelected = false
+                IsSelected = false,
             };
             var textBlock = new TextBlock
             {
                 Inlines = {
                     new Run{ Text = branch.Name },
                     new Run{ Text = branch.InComming > 0 ? $"  ⇃{branch.InComming}" : "", Foreground = Brushes.Green, FontSize = 12 },
-                    new Run{ Text = branch.OutGoing > 0 ? $"  ↾{branch.OutGoing}" : "", Foreground = Brushes.Red, FontSize = 12 }
+                    new Run{ Text = branch.OutGoing > 0 ? $"  ↾{branch.OutGoing}" : "", Foreground = Brushes.Orange, FontSize = 12 }
                 },
                 VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
             };
@@ -931,6 +959,13 @@ public partial class MainWindow : Window
             {
                 newItem.Background = new SolidColorBrush(Color.FromRgb(81, 81, 81));
             }
+
+            var flyout = new Flyout
+            {
+                Placement = PlacementMode.Right,
+                Content = _localbrancheFlyout
+            };
+            newItem.ContextFlyout = flyout;
 
             localBranchesTreeViewItem.Items.Add(newItem);
         }
@@ -1026,9 +1061,18 @@ public partial class MainWindow : Window
         // TODO: Implement create branch dialog
     }
 
-    private void OnRefresh(object sender, RoutedEventArgs e)
+    private async void OnRefresh(object sender, RoutedEventArgs e)
     {
-        // TODO: Implement refresh repository state
+        try
+        {
+            await SyncRepository();
+            AddSuccessCard("Refresh successfully");
+        }
+        catch (Exception ex)
+        {
+            AddErrorCard(ex.Message);
+            return;
+        }
     }
     private async void OnCommitButtonClick(object sender, RoutedEventArgs e)
     {

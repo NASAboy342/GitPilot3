@@ -55,6 +55,7 @@
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="10,0" VerticalAlignment="Center" HorizontalAlignment="Center">
                         <Rectangle Width="1" Height="20" Fill="{StaticResource BorderLightBrush}" Margin="5,0"/>
+                        <Button Classes="Secondary Toolbar" Content="Refresh" Click="OnRefresh"/>
                         <Button Classes="Secondary Toolbar" Content="Fetch" Click="OnFetch"/>
                         <Button Classes="Secondary Toolbar" Content="Pull" Click="OnPull"/>
                         <Button Classes="Secondary Toolbar" Content="Push" Click="OnPush"/>

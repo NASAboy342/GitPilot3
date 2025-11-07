@@ -11,7 +11,7 @@
           </Grid.RowDefinitions>
           <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
               <Border Width="40" Height="40" CornerRadius="20" Background="Green"> <TextBlock Text="✓" FontSize="30" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="White"/> </Border>
-              <TextBlock x:Name="SuccessTitleTextBlock" Classes="H6" Text="Success Title" Foreground="White" Margin="10,0" VerticalAlignment="Center" TextWrapping="Wrap"/>
+              <TextBlock x:Name="SuccessTitleTextBlock" Classes="H6" Text="Success Title" Foreground="White" Margin="10,0" VerticalAlignment="Center" TextWrapping="Wrap" Width="310"/>
           </StackPanel>
           <StackPanel Grid.Row="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
               <Button x:Name="SuccessCloseButton" Width="75" Height="25" Click="OnClickCloseSuccessCard">

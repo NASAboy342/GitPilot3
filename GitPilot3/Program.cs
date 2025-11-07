@@ -46,6 +46,7 @@ class Program
         services.AddTransient<ProfileMenagement>();
         services.AddTransient<AddAccount>();
         services.AddTransient<EditAccount>();
+        services.AddTransient<LocalbrancheFlyout>();
         // Add more services as needed when you create them
     }
 }

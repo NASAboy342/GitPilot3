@@ -10,7 +10,7 @@ namespace GitPilot3.UserControlles;
 public partial class ErrorCard : UserControl
 {
     public EventHandler? CloseErrorCardClicked;
-    public int DelayTimeInSecond { get; set; } = 8;
+    public int DelayTimeInSecond { get; set; } = 30;
     public ErrorCard(string message = "")
     {
         InitializeComponent();

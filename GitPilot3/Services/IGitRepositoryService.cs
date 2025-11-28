@@ -22,4 +22,8 @@ public interface IGitRepositoryService
     Task FetchAsync(string path, UserProfile currentUserProfile);
     Task PullAsync(UserProfile currentUserProfile, GitRepository currentRepository);
     Task CreateNewLocalBranchFromRemoteAsync(string path, string name);
+    Task CreateNewLocalBranchAsync(string path, string inputText);
+    Task PublishBranchAsync(string path, GitRepository currentRepository, UserProfile userProfile);
+    Task MergeBranchAsync(GitRepository currentRepository, string name, UserProfile userProfile);
+    Task DeleteLocalBranchAsync(string path, string name);
 }

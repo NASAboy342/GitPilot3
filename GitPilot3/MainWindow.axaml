@@ -60,7 +60,7 @@
                         <Button Classes="Secondary Toolbar" Content="Pull" Click="OnPull"/>
                         <Button Classes="Secondary Toolbar" Content="Push" Click="OnPush"/>
                         <Rectangle Width="1" Height="20" Fill="{StaticResource BorderLightBrush}" Margin="5,0"/>
-                        <Button Classes="Secondary Toolbar" Content="Branch" />
+                        <Button Classes="Secondary Toolbar" Content="Branch" Click="OnClickCreateBranchOnToolBar"/>
                         <Rectangle Width="1" Height="20" Fill="{StaticResource BorderLightBrush}" Margin="5,0"/>
                         <Button Classes="Secondary Toolbar" Content="Stash" />
                         <Button Classes="Secondary Toolbar" Content="Pop" />
@@ -149,10 +149,7 @@
                                 </StackPanel>
                                 <GridSplitter Grid.Column="1" Width="1" HorizontalAlignment="Center"/>
 
-                                <StackPanel Grid.Column="2">
-                                    <Border Classes="hoverable" Height="25" Padding="5,0,0,0">
-                                        <TextBlock Classes="H8" Text="Graph" VerticalAlignment="Center" />
-                                    </Border>
+                                <StackPanel Grid.Column="2" x:Name="GitGraphColumn">
                                 </StackPanel>
                                 <GridSplitter Grid.Column="3" Width="1" HorizontalAlignment="Center"/>
 

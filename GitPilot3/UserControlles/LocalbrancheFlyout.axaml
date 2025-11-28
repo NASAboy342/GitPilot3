@@ -3,11 +3,11 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              x:Class="GitPilot3.UserControlles.LocalbrancheFlyout">
-  <StackPanel Background="Blue">
-    <Button Content="Merge branch into Current branch" HorizontalAlignment="Stretch"/>
-    <Button Content="Pull" HorizontalAlignment="Stretch" Click="OnPullClick"/>
+  <StackPanel>
+    <Button x:Name="MergeBranchButton" Content="Merge branch into Current branch" HorizontalAlignment="Stretch" Click="OnMergeBranchClick"/>
+    <!-- <Button Content="Pull" HorizontalAlignment="Stretch" Click="OnPullClick"/> -->
     <Button Content="Copy branch's name" HorizontalAlignment="Stretch" Click="OnCopyBranchNameClick"/>
-    <Button Content="Create branch here" HorizontalAlignment="Stretch" Click="OnCreateBranchHereClick"/>
-    <Button Content="Delete" HorizontalAlignment="Stretch" Click="OnDeleteClick"/>
+    <Button x:Name="CreateBranchHereButton" Content="Create branch here" HorizontalAlignment="Stretch" Click="OnCreateBranchHereClick"/>
+    <Button x:Name="DeleteButton" Content="Delete" HorizontalAlignment="Stretch" Click="OnDeleteClick"/>
   </StackPanel>
 </UserControl>

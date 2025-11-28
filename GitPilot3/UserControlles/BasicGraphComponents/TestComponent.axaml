@@ -1,0 +1,18 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             Width="35" Height="35"
+             x:Class="GitPilot3.UserControlles.BasicGraphComponents.TestComponent">
+  <Canvas>
+    <Ellipse Width="28" Height="28"
+             Canvas.Left="4"
+             Canvas.Top="4"
+             Fill="Blue"/>
+      <Line StartPoint="16,35" EndPoint="16,0"
+      Stroke="Blue"
+      StrokeThickness="6"/>
+
+  </Canvas>
+
+</UserControl>

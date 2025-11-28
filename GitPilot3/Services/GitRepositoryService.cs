@@ -106,6 +106,7 @@ public class GitRepositoryService : IGitRepositoryService
                 AuthorName = c.Author.Name,
                 AuthorDate = c.Author.When,
                 BranchName = libgitRepository.Branches.FirstOrDefault(b => b.Tip.Sha == c.Sha)?.FriendlyName ?? "",
+                ParentShas = c.Parents.Select(p => p.Sha).ToList(),
             }).OrderByDescending(c => c.AuthorDate).ToList());
         return commits;
     }
@@ -314,7 +315,6 @@ public class GitRepositoryService : IGitRepositoryService
                     Password = userProfile.Password
                 }
         };
-
         libgitRepository.Network.Push(libgitRepository.Branches[currentBranch.Name], options);
     }
 
@@ -357,5 +357,69 @@ public class GitRepositoryService : IGitRepositoryService
         var localBranchName = string.Join('/', splited);
         var localBranch = libgitRepository.CreateBranch(localBranchName, remoteBranch.Tip);
         libgitRepository.Branches.Update(localBranch, b => b.TrackedBranch = remoteBranch.CanonicalName);
+    }
+
+    public Task CreateNewLocalBranchAsync(string path, string inputText)
+    {
+        var libgitRepository = new Repository(path);
+        var localBranch = libgitRepository.CreateBranch(inputText);
+        return Task.CompletedTask;
+    }
+
+    public async Task PublishBranchAsync(string path, GitRepository currentRepository, UserProfile userProfile)
+    {
+        var libgitRepository = new Repository(path);
+        var currentBranch = currentRepository.LocalBranches.FirstOrDefault(b => b.IsCurrent);
+        if (currentBranch == null){
+            throw new InvalidOperationException("No current branch found to publish.");
+        }
+
+        var remote = libgitRepository.Network.Remotes.First();
+        var pushRefSpec = $"refs/heads/{currentBranch.Name}:refs/heads/{currentBranch.Name}";
+
+        var options = new PushOptions
+        {
+            CredentialsProvider = (_url, _user, _cred) =>
+                new UsernamePasswordCredentials
+                {
+                    Username = userProfile.Username,
+                    Password = userProfile.Password
+                }
+        };
+        libgitRepository.Network.Push(remote, pushRefSpec, options);
+
+        await SetUpstreamBranchAsync(libgitRepository, currentBranch.Name, remote.Name);
+    }
+
+    private async Task SetUpstreamBranchAsync(Repository libgitRepository, string branchname, string origin)
+    {
+        var branch = libgitRepository.Branches[branchname];
+        var remoteBranch = libgitRepository.Branches[$"{origin}/{branchname}"];
+        if (branch != null && remoteBranch != null)
+        {
+            libgitRepository.Branches.Update(branch, b => b.TrackedBranch = remoteBranch.CanonicalName);
+        }
+    }
+
+    public Task MergeBranchAsync(GitRepository currentRepository, string name, UserProfile userProfile)
+    {
+        var libgitRepository = new Repository(currentRepository.Path);
+        var branchToMerge = libgitRepository.Branches[name];
+        if (branchToMerge == null)
+            throw new Exception($"Branch '{name}' not found.");
+
+        var signature = new Signature(userProfile.Username, userProfile.Email, DateTimeOffset.Now);
+        libgitRepository.Merge(branchToMerge, signature);
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteLocalBranchAsync(string path, string name)
+    {
+        var libgitRepository = new Repository(path);
+        var branch = libgitRepository.Branches[name];
+        if (branch == null)
+            throw new Exception($"Branch '{name}' not found.");
+        libgitRepository.Branches.Remove(branch);
+        return Task.CompletedTask;
     }
 }

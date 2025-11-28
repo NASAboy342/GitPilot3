@@ -40,6 +40,7 @@ class Program
         services.AddSingleton<IAppRepository, AppRepository>();
         services.AddSingleton<IAppStageService, AppStageService>();
         services.AddSingleton<ErrorMessageHandler, ErrorMessageHandler>();
+        services.AddSingleton<IGraphComponentService, GraphComponentService>();
 
         services.AddTransient<MainWindow>();
         services.AddTransient<ProfileManagementWindow>();
@@ -47,6 +48,8 @@ class Program
         services.AddTransient<AddAccount>();
         services.AddTransient<EditAccount>();
         services.AddTransient<LocalbrancheFlyout>();
+        services.AddTransient<CommonSimpleInput>();
+        services.AddTransient<CommonConfirmation>();
         // Add more services as needed when you create them
     }
 }

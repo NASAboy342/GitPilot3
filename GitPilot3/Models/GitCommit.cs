@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace GitPilot3.Models;
 
@@ -12,4 +13,5 @@ public class GitCommit
     public int ChangedFilesCount { get; set; }
     public bool IsWorkInProgress { get; set; } = false;
     public string Description { get; set; } = "";
+    public List<string> ParentShas { get; set; } = new List<string>();
 }

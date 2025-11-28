@@ -1,0 +1,21 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             Width="500" 
+             x:Class="GitPilot3.UserControlles.CommonConfirmation">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="50"/>
+    </Grid.RowDefinitions>
+
+    <Border Grid.Row = "0" Margin="10 10 10 0">
+      <TextBlock x:Name="MessageTextBlock" Text="Are you sure?" TextWrapping="Wrap" FontSize="18" VerticalAlignment="Center" HorizontalAlignment="Center" />
+    </Border>
+    <StackPanel Grid.Row = "1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="10" Spacing="10" >
+      <Button Width="100"  VerticalAlignment="Center" Click="OnCancelClick"> <TextBlock Text="Cancel" HorizontalAlignment="Center" VerticalAlignment="Center"/></Button>
+      <Button Width="100"  VerticalAlignment="Center" Click="OnYesClick"> <TextBlock Text="Yes" HorizontalAlignment="Center" VerticalAlignment="Center"/></Button>
+    </StackPanel>
+  </Grid>
+</UserControl>

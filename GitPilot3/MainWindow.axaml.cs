@@ -16,6 +16,7 @@ using Avalonia.Controls.Documents;
 using System.Runtime.InteropServices;
 using System.IO;
 using Avalonia.Threading;
+using GitPilot3.Models.Graph;
 
 namespace GitPilot3;
 
@@ -24,28 +25,30 @@ public partial class MainWindow : Window
     private readonly IFolderPicker _folderPicker;
     private readonly IGitRepositoryService _gitRepositoryService;
     public GitRepository CurrentRepository { get; set; } = new GitRepository();
-    private readonly int _commitMessageRowHeight = 30;
+    private readonly int _commitMessageRowHeight = 35;
     private readonly IUserProfileService _userProfileService;
     private readonly IServiceProvider _serviceProvider;
     private readonly IAppStageService _appStageService;
     private readonly ErrorMessageHandler _errorMessageHandler;
     private FileSystemWatcher? _fileSystemWatcher;
-    private LocalbrancheFlyout _localbrancheFlyout;
+    private IGraphComponentService _graphComponentService;
 
     public MainWindow(IUserProfileService userProfileService,
     IGitRepositoryService gitRepositoryService,
     IServiceProvider serviceProvider,
     IAppStageService appStageService,
     ErrorMessageHandler errorMessageHandler,
-    LocalbrancheFlyout localbrancheFlyout)
+    LocalbrancheFlyout localbrancheFlyout,
+    IGraphComponentService graphComponentService)
     {
         _userProfileService = userProfileService;
         _gitRepositoryService = gitRepositoryService;
         _serviceProvider = serviceProvider;
         _appStageService = appStageService;
         _errorMessageHandler = errorMessageHandler;
-        _localbrancheFlyout = localbrancheFlyout;
         _folderPicker = new FolderPicker(this);
+        _graphComponentService = graphComponentService;
+        _graphComponentService.Height = _commitMessageRowHeight;
         InitializeComponent();
         SetupWindow();
         _errorMessageHandler.ErrorMessageShown += (s, e) => AddErrorCard(e);
@@ -370,6 +373,69 @@ public partial class MainWindow : Window
 
     private void UpdateCommitsGraphView()
     {
+        var commitsGraphStackPanel = this.FindControl<StackPanel>("GitGraphColumn");
+        if (commitsGraphStackPanel == null)
+            return;
+        commitsGraphStackPanel.Children.Clear();
+        commitsGraphStackPanel.Children.Add(GetGraphHeaderItem("Graph"));
+        DrawGraphs(commitsGraphStackPanel);
+    }
+
+    private void DrawGraphs(StackPanel commitsGraphStackPanel)
+    {
+        var branchDrawBuffers = new List<BranchDrawBuffer>();
+        foreach (var commit in CurrentRepository.Commits)
+        {
+            var newCanvas = new Canvas
+            {
+                Height = _commitMessageRowHeight,
+            };
+
+            var isAlreadyDrawnCommitPoint = false;
+            BranchDrawBuffer? pendingRemoveFromBranchBuffer = null;
+            foreach (var branchDrawBuffer in branchDrawBuffers)
+            {
+                if (IsFoundParentCommit(commit, branchDrawBuffer))
+                {
+                    if (isAlreadyDrawnCommitPoint)
+                    {
+                        newCanvas.Children.Add(_graphComponentService.GetCheckOutCurveLineCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer)));
+                        pendingRemoveFromBranchBuffer = branchDrawBuffer;
+                    }
+                    else
+                    {
+                        newCanvas.Children.Add(_graphComponentService.GetUpperConnectorLineCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer)));
+                        newCanvas.Children.Add(_graphComponentService.GetCommitPointCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer)));
+                        newCanvas.Children.Add(_graphComponentService.GetLowerConnectorLineCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer)));
+                        branchDrawBuffer.Sha = commit.Sha;
+                        branchDrawBuffer.ParentShas = commit.ParentShas;
+                        isAlreadyDrawnCommitPoint = true;
+                    }
+                }
+                else
+                {
+                    newCanvas.Children.Add(_graphComponentService.GetBranchLineCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer)));
+                }
+            }
+            if (!isAlreadyDrawnCommitPoint)
+            {
+                newCanvas.Children.Add(_graphComponentService.GetCommitPointCanvas(branchDrawBuffers.Count));
+                newCanvas.Children.Add(_graphComponentService.GetLowerConnectorLineCanvas(branchDrawBuffers.Count));
+                branchDrawBuffers.Add(new BranchDrawBuffer { Sha = commit.Sha, ParentShas = commit.ParentShas });
+            }
+            if (pendingRemoveFromBranchBuffer != null)
+            {
+                branchDrawBuffers.Remove(pendingRemoveFromBranchBuffer);
+            }
+
+
+            commitsGraphStackPanel.Children.Add(newCanvas);
+        }
+    }
+
+    private static bool IsFoundParentCommit(GitCommit commit, BranchDrawBuffer branchDrawBuffer)
+    {
+        return commit.Sha.Equals(branchDrawBuffer.ParentShas[0]);
     }
 
     private void UpdateCommitsMessageView()
@@ -933,42 +999,238 @@ public partial class MainWindow : Window
         localBranchesTreeViewItem.Items.Clear();
         foreach (var branch in CurrentRepository.LocalBranches)
         {
-            var newItem = new TreeViewItem
-            {
-                IsSelected = false,
-            };
-            var textBlock = new TextBlock
-            {
-                Inlines = {
+            localBranchesTreeViewItem.Items.Add(GetLocalBranchViewItem(branch));
+        }
+    }
+
+    private TreeViewItem GetLocalBranchViewItem(GitBranch branch)
+    {
+        var newItem = new TreeViewItem
+        {
+            IsSelected = false,
+        };
+
+        newItem.Header = GetLocalBranchStatusIndicator(branch);
+        newItem.ContextFlyout = GetLocalBranchFlyoutMenu(branch);
+
+        if (branch.IsCurrent)
+            newItem.Background = new SolidColorBrush(Color.FromRgb(81, 81, 81));
+
+        ActionOnItemIsDoubleClick(branch, newItem);
+
+        return newItem;
+    }
+
+    private void ActionOnItemIsDoubleClick(GitBranch branch, TreeViewItem newItem)
+    {
+        newItem.DoubleTapped += async (sender, e) =>
+        {
+            await OnLocalBranchDoubleClicked(branch.Name);
+            e.Handled = true;
+        };
+    }
+
+    private static TextBlock GetLocalBranchStatusIndicator(GitBranch branch)
+    {
+        return new TextBlock
+        {
+            Inlines = {
                     new Run{ Text = branch.Name },
                     new Run{ Text = branch.InComming > 0 ? $"  ⇃{branch.InComming}" : "", Foreground = Brushes.Green, FontSize = 12 },
                     new Run{ Text = branch.OutGoing > 0 ? $"  ↾{branch.OutGoing}" : "", Foreground = Brushes.Orange, FontSize = 12 }
                 },
-                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-            };
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+        };
+    }
 
-            newItem.Header = textBlock;
+    private Flyout GetLocalBranchFlyoutMenu(GitBranch branch)
+    {
+        var newLocalbrancheFlyoutComponent = _serviceProvider.GetService(typeof(LocalbrancheFlyout)) as LocalbrancheFlyout;
+        var flyout = new Flyout
+        {
+            Placement = PlacementMode.Right,
+            Content = newLocalbrancheFlyoutComponent
+        };
+        ActionOnLocalBranchFlyoutMenuIsOpened(branch, newLocalbrancheFlyoutComponent, flyout);
+        ActionOnCreateNewLocalbranchClicked(branch, newLocalbrancheFlyoutComponent, flyout);
+        ActionOnMergeBranchClicked(branch, newLocalbrancheFlyoutComponent, flyout);
+        ActionOnDeleteBranchClicked(branch, newLocalbrancheFlyoutComponent, flyout);
+        return flyout;
+    }
 
-            newItem.DoubleTapped += async (sender, e) =>
+    private void ActionOnDeleteBranchClicked(GitBranch branch, LocalbrancheFlyout newLocalbrancheFlyoutComponent, Flyout flyout)
+    {
+        newLocalbrancheFlyoutComponent!.OnDeleteClicked += async (s, e) =>
+        {
+            try
             {
-                await OnLocalBranchDoubleClicked(branch.Name);
-                e.Handled = true;
-            };
-
-            if (branch.IsCurrent)
-            {
-                newItem.Background = new SolidColorBrush(Color.FromRgb(81, 81, 81));
+                flyout.Hide();
+                await ConfirmIfToDeleteLocalBranch(branch);
             }
-
-            var flyout = new Flyout
+            catch (Exception ex)
             {
-                Placement = PlacementMode.Right,
-                Content = _localbrancheFlyout
-            };
-            newItem.ContextFlyout = flyout;
+                AddErrorCard(ex.Message);
+                return;
+            }
+        };
+    }
 
-            localBranchesTreeViewItem.Items.Add(newItem);
+    private async Task ConfirmIfToDeleteLocalBranch(GitBranch branch)
+    {
+        var newWindow = new Window
+        {
+            Title = "Confirm Delete Branch",
+            Width = 500,
+            SizeToContent = SizeToContent.Height,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        newWindow.Content = GetConfirmDeleteBranchComponent(branch, newWindow);
+        newWindow.ShowDialog(this);
+    }
+
+    private CommonConfirmation GetConfirmDeleteBranchComponent(GitBranch branch, Window newWindow)
+    {
+        var commonConfirmation = _serviceProvider.GetService(typeof(CommonConfirmation)) as CommonConfirmation;
+        commonConfirmation.Message = $"Are you sure you want to delete the branch '{branch.Name}'?";
+        commonConfirmation.OnYesClicked += async (ss, ee) =>
+        {
+            await ProcessDeleteBranch(branch);
+            newWindow.Close();
+        };
+        commonConfirmation.OnCancelClicked += (ss, ee) =>
+        {
+            newWindow.Close();
+        };
+        return commonConfirmation;
+    }
+
+    private async Task ProcessDeleteBranch(GitBranch branch)
+    {
+        try
+        {
+            await _gitRepositoryService.DeleteLocalBranchAsync(CurrentRepository.Path, branch.Name);
+            CurrentRepository.LocalBranches = await _gitRepositoryService.GetLocalBranchesAsync(CurrentRepository.Path);
+            UpdateLocalBranchesTreeView();
+            UpdateCurrentBranchNameDisplay();
+            AddSuccessCard($"Deleted branch: {branch.Name} successfully.");
         }
+        catch (Exception ex)
+        {
+            AddErrorCard(ex.Message);
+            return;
+        }
+    }
+
+    private void ActionOnMergeBranchClicked(GitBranch branch, LocalbrancheFlyout newLocalbrancheFlyoutComponent, Flyout flyout)
+    {
+        newLocalbrancheFlyoutComponent!.OnMergeBranchClicked += async (s, e) =>
+        {
+            try
+            {
+                flyout.Hide();
+                var userProfile = await _userProfileService.GetCurrentUserProfileAsync();
+                await _gitRepositoryService.MergeBranchAsync(CurrentRepository, branch.Name, userProfile);
+                CurrentRepository.LocalBranches = await _gitRepositoryService.GetLocalBranchesAsync(CurrentRepository.Path);
+                CurrentRepository.Commits = await _gitRepositoryService.GetCommitsAsync(CurrentRepository.Path);
+                UpdateLocalBranchesTreeView();
+                UpdateCurrentBranchNameDisplay();
+                UpdateCommitsInfoView();
+                AddSuccessCard($"Merged branch: {branch.Name} into current branch successfully.");
+            }
+            catch (Exception ex)
+            {
+                AddErrorCard(ex.Message);
+                return;
+            }
+        };
+    }
+
+    private void OnClickCreateBranchOnToolBar(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            LoadCreateBranchInputWindow();
+        }
+        catch (Exception ex)
+        {
+            AddErrorCard(ex.Message);
+            return;
+        }
+    }
+
+    private void ActionOnCreateNewLocalbranchClicked(GitBranch branch, LocalbrancheFlyout newLocalbrancheFlyoutComponent, Flyout flyout)
+    {
+        newLocalbrancheFlyoutComponent!.OnCreateBranchHereClicked += async (s, e) =>
+        {
+            try
+            {
+                flyout.Hide();
+                LoadCreateBranchInputWindow();
+            }
+            catch (Exception ex)
+            {
+                AddErrorCard(ex.Message);
+                return;
+            }
+        };
+    }
+
+    private void LoadCreateBranchInputWindow()
+    {
+        var newWindow = new Window
+        {
+            Title = "Create New Branch",
+            Width = 500,
+            Height = 100,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        newWindow.Content = GetBranchNameInputComponent(newWindow);
+        newWindow.ShowDialog(this);
+    }
+
+    private CommonSimpleInput GetBranchNameInputComponent(Window newWindow)
+    {
+        var commonSimpleInput = _serviceProvider.GetService(typeof(CommonSimpleInput)) as CommonSimpleInput;
+        commonSimpleInput.IsAllowSpaces = false;
+        commonSimpleInput.PlaceHolderText = "Enter new branch name";
+        commonSimpleInput.OnOkClicked += async (ss, ee) =>
+        {
+            try
+            {
+                await _gitRepositoryService.CreateNewLocalBranchAsync(CurrentRepository.Path, commonSimpleInput.InputText);
+                CurrentRepository.LocalBranches = await _gitRepositoryService.GetLocalBranchesAsync(CurrentRepository.Path);
+                UpdateLocalBranchesTreeView();
+                AddSuccessCard($"Created new branch: {commonSimpleInput.InputText} successfully.");
+            }
+            catch (Exception ex)
+            {
+                AddErrorCard(ex.Message);
+                return;
+            }
+            newWindow.Close();
+        };
+        commonSimpleInput.OnCancelClicked += (ss, ee) =>
+        {
+            newWindow.Close();
+        };
+        return commonSimpleInput;
+    }
+
+    private void ActionOnLocalBranchFlyoutMenuIsOpened(GitBranch branch, LocalbrancheFlyout? newLocalbrancheFlyoutComponent, Flyout flyout)
+    {
+        flyout.Opened += (s, e) =>
+        {
+            try
+            {
+                var flyoutLoadFrom = branch.Name;
+                newLocalbrancheFlyoutComponent.UpdateFlyout(flyoutLoadFrom, CurrentRepository.LocalBranches.FirstOrDefault(b => b.IsCurrent)?.Name ?? "");
+            }
+            catch (Exception ed)
+            {
+                AddErrorCard(ed.Message);
+                return;
+            }
+        };
     }
 
     private async Task OnLocalBranchDoubleClicked(string name)
@@ -1051,10 +1313,58 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            if (ex.Message.Contains("that you are trying to push does not track an upstream branch."))
+            {
+                ConfirmToPushToOrigin();
+                return;
+            }
             AddErrorCard(ex.Message);
             return;
         }
     }
+
+    private void ConfirmToPushToOrigin()
+    {
+        var newWindow = new Window
+        {
+            Title = "Confirm Push to Origin",
+            Width = 500,
+            Height = double.NaN,
+            SizeToContent = SizeToContent.Height,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        newWindow.Content = GetConfirmPushToOriginComponent(newWindow);
+        newWindow.ShowDialog(this);
+    }
+
+    private object? GetConfirmPushToOriginComponent(Window newWindow)
+    {
+        var commonConfirmation = _serviceProvider.GetService(typeof(CommonConfirmation)) as CommonConfirmation;
+        commonConfirmation!.Message = $"Do you want to publish branch?";
+        commonConfirmation.OnYesClicked += async (ss, ee) =>
+        {
+            try
+            {
+                newWindow.Close();
+                var userProfile = await _userProfileService.GetCurrentUserProfileAsync();
+                await _gitRepositoryService.PublishBranchAsync(CurrentRepository.Path, CurrentRepository, userProfile);
+                await SyncRepository();
+                AddSuccessCard("Branch published and changes pushed to remote repository successfully.");
+            }
+            catch (Exception ex)
+            {
+                AddErrorCard(ex.Message);
+                return;
+            }
+            newWindow.Close();
+        };
+        commonConfirmation.OnCancelClicked += (ss, ee) =>
+        {
+            newWindow.Close();
+        };
+        return commonConfirmation;
+    }
+
 
     private void OnCreateBranch(object sender, RoutedEventArgs e)
     {

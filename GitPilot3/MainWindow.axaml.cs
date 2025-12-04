@@ -384,15 +384,17 @@ public partial class MainWindow : Window
     private void DrawGraphs(StackPanel commitsGraphStackPanel)
     {
         var branchDrawBuffers = new List<BranchDrawBuffer>();
+        var mergePointBuffers = new List<MergePointBuffer>();
         foreach (var commit in CurrentRepository.Commits)
         {
+            var isAMergeCommit = commit.ParentShas.Count > 1;
             var newCanvas = new Canvas
             {
                 Height = _commitMessageRowHeight,
             };
-
             var isAlreadyDrawnCommitPoint = false;
-            BranchDrawBuffer? pendingRemoveFromBranchBuffer = null;
+            var drawnCommitPointIndex = 0;
+            var pendingRemoveFromBranchBuffers = new List<BranchDrawBuffer>();
             foreach (var branchDrawBuffer in branchDrawBuffers)
             {
                 if (IsFoundParentCommit(commit, branchDrawBuffer))
@@ -400,16 +402,18 @@ public partial class MainWindow : Window
                     if (isAlreadyDrawnCommitPoint)
                     {
                         newCanvas.Children.Add(_graphComponentService.GetCheckOutCurveLineCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer)));
-                        pendingRemoveFromBranchBuffer = branchDrawBuffer;
+                        DrawCheckoutLineFromParent(branchDrawBuffers, newCanvas, drawnCommitPointIndex, branchDrawBuffer);
+                        pendingRemoveFromBranchBuffers.Add(branchDrawBuffer);
                     }
                     else
                     {
                         newCanvas.Children.Add(_graphComponentService.GetUpperConnectorLineCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer)));
-                        newCanvas.Children.Add(_graphComponentService.GetCommitPointCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer)));
+                        newCanvas.Children.Add(_graphComponentService.GetCommitPointCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer), isAMergeCommit));
                         newCanvas.Children.Add(_graphComponentService.GetLowerConnectorLineCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer)));
                         branchDrawBuffer.Sha = commit.Sha;
                         branchDrawBuffer.ParentShas = commit.ParentShas;
                         isAlreadyDrawnCommitPoint = true;
+                        drawnCommitPointIndex = branchDrawBuffers.IndexOf(branchDrawBuffer);
                     }
                 }
                 else
@@ -419,17 +423,97 @@ public partial class MainWindow : Window
             }
             if (!isAlreadyDrawnCommitPoint)
             {
-                newCanvas.Children.Add(_graphComponentService.GetCommitPointCanvas(branchDrawBuffers.Count));
+                newCanvas.Children.Add(_graphComponentService.GetCommitPointCanvas(branchDrawBuffers.Count, isAMergeCommit));
                 newCanvas.Children.Add(_graphComponentService.GetLowerConnectorLineCanvas(branchDrawBuffers.Count));
                 branchDrawBuffers.Add(new BranchDrawBuffer { Sha = commit.Sha, ParentShas = commit.ParentShas });
             }
-            if (pendingRemoveFromBranchBuffer != null)
+
+            if (IsFountParentSource(mergePointBuffers, commit, out List<MergePointBuffer> foundMergePoints))
             {
-                branchDrawBuffers.Remove(pendingRemoveFromBranchBuffer);
+                DrawMerge(branchDrawBuffers, mergePointBuffers, commit, newCanvas, foundMergePoints);
+            }
+            mergePointBuffers.ForEach(mp => mp.RowsAwayFromMergePoint++);
+
+            if (isAMergeCommit)
+            {
+                SaveMergePoint(branchDrawBuffers, mergePointBuffers, commit);
+            }
+            if (pendingRemoveFromBranchBuffers.Any())
+            {
+                foreach (var buffer in pendingRemoveFromBranchBuffers)
+                {
+                    branchDrawBuffers.Remove(buffer);
+                }
             }
 
 
             commitsGraphStackPanel.Children.Add(newCanvas);
+        }
+    }
+
+    private void DrawMerge(List<BranchDrawBuffer> branchDrawBuffers, List<MergePointBuffer> mergePointBuffers, GitCommit commit, Canvas newCanvas, List<MergePointBuffer> foundMergePoints)
+    {
+        foreach (var foundMergePoint in foundMergePoints)
+        {
+            for (int i = 1; i <= foundMergePoint.RowsAwayFromMergePoint; i++)
+            {
+                if (i == foundMergePoint.RowsAwayFromMergePoint)
+                {
+                    var currentBranchFromBuffer = branchDrawBuffers.First(b => b.Sha.Equals(commit.Sha));
+                    newCanvas.Children.Add(_graphComponentService.GetMergeCurveLineOnOtherRowCanvas(branchDrawBuffers.IndexOf(currentBranchFromBuffer), i * -1, foundMergePoint.MergeToIndex));
+                    DrawHorizontalLineToMergeTarget(branchDrawBuffers, newCanvas, foundMergePoint, i, currentBranchFromBuffer);
+                }
+                else
+                {
+                    var currentBranchFromBuffer = branchDrawBuffers.First(b => b.Sha.Equals(commit.Sha));
+                    newCanvas.Children.Add(_graphComponentService.GetBranchLineCanvasOnOtherRow(branchDrawBuffers.IndexOf(currentBranchFromBuffer), i * -1));
+                }
+            }
+            mergePointBuffers.Remove(foundMergePoint);
+        }
+    }
+
+    private void DrawHorizontalLineToMergeTarget(List<BranchDrawBuffer> branchDrawBuffers, Canvas newCanvas, MergePointBuffer foundMergePoint, int i, BranchDrawBuffer currentBranchFromBuffer)
+    {
+        for (int stepToMergeTarget = branchDrawBuffers.IndexOf(currentBranchFromBuffer) - 1; stepToMergeTarget > foundMergePoint.MergeToIndex; stepToMergeTarget--)
+        {
+            newCanvas.Children.Add(_graphComponentService.HorizontalLineOnOtherRowCanvas(stepToMergeTarget, i * -1));
+        }
+    }
+
+    private bool IsFountParentSource(List<MergePointBuffer> mergePointBuffers, GitCommit commit, out List<MergePointBuffer> foundMergePoints)
+    {
+        foundMergePoints = new List<MergePointBuffer>();
+        foreach (var mergePoint in mergePointBuffers)
+        {
+            if (mergePoint.MergeFromSha.Equals(commit.Sha))
+            {
+                foundMergePoints.Add(mergePoint);
+            }
+        }
+        return foundMergePoints.Count > 0;
+    }
+
+    private static void SaveMergePoint(List<BranchDrawBuffer> branchDrawBuffers, List<MergePointBuffer> mergePointBuffers, GitCommit commit)
+    {
+        for (var i = 1; i < commit.ParentShas.Count; i++)
+        {
+            var targetBranchDrawBuffer = branchDrawBuffers.First(x => x.Sha.Equals(commit.Sha));
+            mergePointBuffers.Add(new MergePointBuffer
+            {
+                MergeFromSha = commit.ParentShas[i],
+                MergeToIndex = branchDrawBuffers.IndexOf(targetBranchDrawBuffer),
+                RowsAwayFromMergePoint = 1
+            });
+        }
+    }
+
+    private void DrawCheckoutLineFromParent(List<BranchDrawBuffer> branchDrawBuffers, Canvas newCanvas, int drawnCommitPointIndex, BranchDrawBuffer branchDrawBuffer)
+    {
+        var currentIndex = branchDrawBuffers.IndexOf(branchDrawBuffer);
+        for (var i = currentIndex - 1; i > drawnCommitPointIndex; i--)
+        {
+            newCanvas.Children.Add(_graphComponentService.HorizontalLineCanvas(i));
         }
     }
 
@@ -447,12 +531,13 @@ public partial class MainWindow : Window
         commitsMessageStackPanel.Children.Add(GetGraphHeaderItem("Commit Messages"));
         foreach (var commit in CurrentRepository.Commits)
         {
+            var parentCommits = $" parents: {string.Join(", ", commit.ParentShas.Select(p => p.Substring(0, 7)))}";
             var commitMessageItem = new Border
             {
                 Height = _commitMessageRowHeight,
                 Child = new TextBlock
                 {
-                    Text = commit.Message + (commit.IsWorkInProgress ? $"   ✏️{commit.ChangedFilesCount}" : ""),
+                    Text = commit.Message + (commit.IsWorkInProgress ? $"   ✏️{commit.ChangedFilesCount}" : "") + parentCommits,
                     FontSize = 12,
                     VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
                     Margin = new Avalonia.Thickness(5, 0, 0, 0)

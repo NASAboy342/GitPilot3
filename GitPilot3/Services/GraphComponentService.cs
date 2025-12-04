@@ -10,8 +10,8 @@ public class GraphComponentService : IGraphComponentService
 {
     public int Height { get; set; } = 40;
 
-    private int _lineThickness = 6;
-    public Ellipse GetCommitPointCanvas(int index = 0)
+    private int _lineThickness = 3;
+    public Ellipse GetCommitPointCanvas(int index = 0, bool isAMergeCommit = false)
     {
         var circle = new Ellipse
         {
@@ -96,7 +96,7 @@ public class GraphComponentService : IGraphComponentService
         var startY = 0;
         var controlX = (circle.Width * index - circle.Width / 2) + adjustedMarginLeft; ;
         var controlY = Height / 2;
-        var endX = (circle.Width * index - circle.Width) + adjustedMarginLeft;
+        var endX = (circle.Width * index - circle.Width) + (adjustedMarginLeft / 2);
         var endY = Height / 2;
         // Define a Path
         var path = new Path
@@ -130,5 +130,111 @@ public class GraphComponentService : IGraphComponentService
         path.Data = geometry;
 
         return path;
+    }
+
+    public Control HorizontalLineCanvas(int index = 0)
+    {
+        index++;
+        var circle = GetCommitPointCanvas(index);
+        var adjustedMarginLeft = ((Height / 2) - (circle.Width / 2)) * index;
+        var startX = (circle.Width * index) + adjustedMarginLeft;
+        var startY = Height / 2;
+        var endX = (circle.Width * index - circle.Width);
+        var endY = Height / 2;
+
+        var line = new Line
+        {
+            Stroke = Brushes.DodgerBlue,
+            StrokeThickness = _lineThickness,
+            StartPoint = new Point(startX, startY),
+            EndPoint = new Point(endX, endY),
+        };
+        return line;
+    }
+
+    public Control GetBranchLineCanvasOnOtherRow(int index, int relativeRow)
+    {
+        index++;
+        var circle = GetCommitPointCanvas(index);
+        var adjustedMarginLeft = ((Height / 2) - (circle.Width / 2)) * index;
+        var startX = (circle.Width * index - circle.Width / 2) + adjustedMarginLeft;
+        var startY = 0 + (Height * relativeRow);
+        var endX = (circle.Width * index - circle.Width / 2) + adjustedMarginLeft;
+        var endY = Height + (Height * relativeRow) + adjustedMarginLeft;
+
+        var line = new Line
+        {
+            Stroke = Brushes.DodgerBlue,
+            StrokeThickness = _lineThickness,
+            StartPoint = new Point(startX, startY),
+            EndPoint = new Point(endX, endY),
+        };
+        return line;
+    }
+
+    public Control GetMergeCurveLineOnOtherRowCanvas(int index, int relativeRow, int mergeToIndex)
+    {
+        var isMergeToRight = mergeToIndex > index;
+        index++;
+        var circle = GetCommitPointCanvas(index);
+        var adjustedMarginLeft = ((Height / 2) - (circle.Width / 2)) * index;
+        var startX = (circle.Width * index - circle.Width / 2) + adjustedMarginLeft;
+        var startY =  (Height * relativeRow) + Height + (adjustedMarginLeft / 2);
+        var controlX = (circle.Width * index - circle.Width / 2) + adjustedMarginLeft; ;
+        var controlY = Height / 2 + (Height * relativeRow);
+        var endX = (circle.Width * index - (isMergeToRight ? 0 : circle.Width)) + (adjustedMarginLeft * (isMergeToRight ? 2 : 0.5));
+        var endY = Height / 2 + (Height * relativeRow);
+        // Define a Path
+        var path = new Path
+        {
+            Stroke = Brushes.DodgerBlue,
+            StrokeThickness = _lineThickness
+            
+        };
+
+        // Geometry: Move to (10,100), then quadratic Bezier to (200,100) with control point (100,10)
+        var geometry = new PathGeometry
+        {
+            Figures = new PathFigures
+            {
+                new PathFigure
+                {
+                    StartPoint = new Point(startX, startY),
+                    IsClosed = false,
+                    Segments = new PathSegments
+                    {
+                        new QuadraticBezierSegment
+                        {
+                            Point1 = new Point(controlX, controlY),   // control point
+                            Point2 = new Point(endX, endY)   // end point
+                        }
+                    }
+                }
+            }
+        };
+
+        path.Data = geometry;
+
+        return path;
+    }
+
+    public Control HorizontalLineOnOtherRowCanvas(int index, int relativeRow)
+    {
+        index++;
+        var circle = GetCommitPointCanvas(index);
+        var adjustedMarginLeft = ((Height / 2) - (circle.Width / 2)) * index;
+        var startX = (circle.Width * index) + adjustedMarginLeft;
+        var startY = (Height / 2) + (Height * relativeRow);
+        var endX = (circle.Width * index - circle.Width);
+        var endY = (Height / 2) + (Height * relativeRow);
+
+        var line = new Line
+        {
+            Stroke = Brushes.DodgerBlue,
+            StrokeThickness = _lineThickness,
+            StartPoint = new Point(startX, startY),
+            EndPoint = new Point(endX, endY),
+        };
+        return line;
     }
 }

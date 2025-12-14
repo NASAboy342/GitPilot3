@@ -62,6 +62,8 @@ public partial class MainWindow : Window
         {
             if (String.IsNullOrEmpty(CurrentRepository.Path))
                 return;
+            if (!CurrentRepository.IsAutoRefreshDisabled)
+                return;
             _fileSystemWatcher?.Dispose();
             _fileSystemWatcher = new FileSystemWatcher
             {
@@ -100,17 +102,29 @@ public partial class MainWindow : Window
     {
         if (CurrentRepository == null || string.IsNullOrEmpty(CurrentRepository.Path))
             throw new InvalidOperationException("No repository is currently loaded.");
-        var localBranches = await _gitRepositoryService.GetLocalBranchesAsync(CurrentRepository.Path);
+
+        var localBranches = new List<GitBranch>();
+        var remoteBranches = new List<GitBranch>();
+
+        var tasks = new List<Task>()
+        {
+            Task.Run(async () => {localBranches = await _gitRepositoryService.GetLocalBranchesAsync(CurrentRepository.Path);}),
+            Task.Run(async () => {remoteBranches = await _gitRepositoryService.GetRemoteBranchesAsync(CurrentRepository.Path);}),
+            Task.Run(async () => {CurrentRepository.Commits = await _gitRepositoryService.GetCommitsAsync(CurrentRepository.Path);}),
+        };
+
+        await Task.WhenAll(tasks);
+        
         UpdateLocalBranches(localBranches);
-        var remoteBranches = await _gitRepositoryService.GetRemoteBranchesAsync(CurrentRepository.Path);
         UpdateRemoteBranches(remoteBranches);
-        CurrentRepository.Commits = await _gitRepositoryService.GetCommitsAsync(CurrentRepository.Path);
         UpdateCurrentRepositoryDisplay();
+
         if (CurrentRepository.CommitDetail != null && !string.IsNullOrEmpty(CurrentRepository.CommitDetail.Commit.Sha))
         {
             CurrentRepository.CommitDetail = await _gitRepositoryService.GetCommitDetailsAsync(CurrentRepository.Path, CurrentRepository.CommitDetail.Commit);
             UpdateFileChangesView();
         }
+
         _appStageService.SaveCurrentRepository(CurrentRepository);
     }
 
@@ -401,15 +415,15 @@ public partial class MainWindow : Window
                 {
                     if (isAlreadyDrawnCommitPoint)
                     {
-                        newCanvas.Children.Add(_graphComponentService.GetCheckOutCurveLineCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer)));
+                        newCanvas.Children.Add(_graphComponentService.GetCheckOutCurveLineCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer), branchDrawBuffer.Color));
                         DrawCheckoutLineFromParent(branchDrawBuffers, newCanvas, drawnCommitPointIndex, branchDrawBuffer);
                         pendingRemoveFromBranchBuffers.Add(branchDrawBuffer);
                     }
                     else
                     {
-                        newCanvas.Children.Add(_graphComponentService.GetUpperConnectorLineCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer)));
-                        newCanvas.Children.Add(_graphComponentService.GetCommitPointCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer), isAMergeCommit));
-                        newCanvas.Children.Add(_graphComponentService.GetLowerConnectorLineCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer)));
+                        newCanvas.Children.Add(_graphComponentService.GetUpperConnectorLineCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer), branchDrawBuffer.Color));
+                        newCanvas.Children.Add(_graphComponentService.GetCommitPointCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer), isAMergeCommit, branchDrawBuffer.Color));
+                        newCanvas.Children.Add(_graphComponentService.GetLowerConnectorLineCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer), branchDrawBuffer.Color));
                         branchDrawBuffer.Sha = commit.Sha;
                         branchDrawBuffer.ParentShas = commit.ParentShas;
                         isAlreadyDrawnCommitPoint = true;
@@ -418,14 +432,15 @@ public partial class MainWindow : Window
                 }
                 else
                 {
-                    newCanvas.Children.Add(_graphComponentService.GetBranchLineCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer)));
+                    newCanvas.Children.Add(_graphComponentService.GetBranchLineCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer), branchDrawBuffer.Color));
                 }
             }
             if (!isAlreadyDrawnCommitPoint)
             {
-                newCanvas.Children.Add(_graphComponentService.GetCommitPointCanvas(branchDrawBuffers.Count, isAMergeCommit));
-                newCanvas.Children.Add(_graphComponentService.GetLowerConnectorLineCanvas(branchDrawBuffers.Count));
-                branchDrawBuffers.Add(new BranchDrawBuffer { Sha = commit.Sha, ParentShas = commit.ParentShas });
+                var relativeColor = GetBranchColorOfCommit(commit, CurrentRepository);
+                newCanvas.Children.Add(_graphComponentService.GetCommitPointCanvas(branchDrawBuffers.Count, isAMergeCommit, relativeColor));
+                newCanvas.Children.Add(_graphComponentService.GetLowerConnectorLineCanvas(branchDrawBuffers.Count, relativeColor));
+                branchDrawBuffers.Add(new BranchDrawBuffer { Sha = commit.Sha, ParentShas = commit.ParentShas, Color = relativeColor });
             }
 
             if (IsFountParentSource(mergePointBuffers, commit, out List<MergePointBuffer> foundMergePoints))
@@ -451,6 +466,17 @@ public partial class MainWindow : Window
         }
     }
 
+    private RGBColor GetBranchColorOfCommit(GitCommit commit, GitRepository currentRepository)
+    {
+        var branch = currentRepository.LocalBranches.FirstOrDefault(b => b.Name.Equals(commit.BranchName))
+            ?? currentRepository.RemoteBranches.FirstOrDefault(b => b.Name.Equals(commit.BranchName));
+        if (branch != null)
+        {
+            return branch.Color;
+        }
+        return new RGBColor(0, 0, 0);
+    }
+
     private void DrawMerge(List<BranchDrawBuffer> branchDrawBuffers, List<MergePointBuffer> mergePointBuffers, GitCommit commit, Canvas newCanvas, List<MergePointBuffer> foundMergePoints)
     {
         foreach (var foundMergePoint in foundMergePoints)
@@ -460,13 +486,14 @@ public partial class MainWindow : Window
                 if (i == foundMergePoint.RowsAwayFromMergePoint)
                 {
                     var currentBranchFromBuffer = branchDrawBuffers.First(b => b.Sha.Equals(commit.Sha));
-                    newCanvas.Children.Add(_graphComponentService.GetMergeCurveLineOnOtherRowCanvas(branchDrawBuffers.IndexOf(currentBranchFromBuffer), i * -1, foundMergePoint.MergeToIndex));
+                    newCanvas.Children.Add(_graphComponentService.GetUpperConnectorLineCanvas(branchDrawBuffers.IndexOf(currentBranchFromBuffer), currentBranchFromBuffer.Color));
+                    newCanvas.Children.Add(_graphComponentService.GetMergeCurveLineOnOtherRowCanvas(branchDrawBuffers.IndexOf(currentBranchFromBuffer), i * -1, foundMergePoint.MergeToIndex, currentBranchFromBuffer.Color));
                     DrawHorizontalLineToMergeTarget(branchDrawBuffers, newCanvas, foundMergePoint, i, currentBranchFromBuffer);
                 }
                 else
                 {
                     var currentBranchFromBuffer = branchDrawBuffers.First(b => b.Sha.Equals(commit.Sha));
-                    newCanvas.Children.Add(_graphComponentService.GetBranchLineCanvasOnOtherRow(branchDrawBuffers.IndexOf(currentBranchFromBuffer), i * -1));
+                    newCanvas.Children.Add(_graphComponentService.GetBranchLineCanvasOnOtherRow(branchDrawBuffers.IndexOf(currentBranchFromBuffer), i * -1, currentBranchFromBuffer.Color));
                 }
             }
             mergePointBuffers.Remove(foundMergePoint);
@@ -475,9 +502,20 @@ public partial class MainWindow : Window
 
     private void DrawHorizontalLineToMergeTarget(List<BranchDrawBuffer> branchDrawBuffers, Canvas newCanvas, MergePointBuffer foundMergePoint, int i, BranchDrawBuffer currentBranchFromBuffer)
     {
-        for (int stepToMergeTarget = branchDrawBuffers.IndexOf(currentBranchFromBuffer) - 1; stepToMergeTarget > foundMergePoint.MergeToIndex; stepToMergeTarget--)
+        var isMergeToRight = branchDrawBuffers.IndexOf(currentBranchFromBuffer) < foundMergePoint.MergeToIndex;
+        if (isMergeToRight)
         {
-            newCanvas.Children.Add(_graphComponentService.HorizontalLineOnOtherRowCanvas(stepToMergeTarget, i * -1));
+            for (int stepToMergeTarget = branchDrawBuffers.IndexOf(currentBranchFromBuffer) + 1; stepToMergeTarget < foundMergePoint.MergeToIndex; stepToMergeTarget++)
+            {
+                newCanvas.Children.Add(_graphComponentService.HorizontalLineToRightOnOtherRowCanvas(stepToMergeTarget, i * -1, currentBranchFromBuffer.Color));
+            }
+        }
+        else
+        {
+            for (int stepToMergeTarget = branchDrawBuffers.IndexOf(currentBranchFromBuffer) - 1; stepToMergeTarget > foundMergePoint.MergeToIndex; stepToMergeTarget--)
+            {
+                newCanvas.Children.Add(_graphComponentService.HorizontalLineToLeftOnOtherRowCanvas(stepToMergeTarget, i * -1, currentBranchFromBuffer.Color));
+            }
         }
     }
 
@@ -513,7 +551,7 @@ public partial class MainWindow : Window
         var currentIndex = branchDrawBuffers.IndexOf(branchDrawBuffer);
         for (var i = currentIndex - 1; i > drawnCommitPointIndex; i--)
         {
-            newCanvas.Children.Add(_graphComponentService.HorizontalLineCanvas(i));
+            newCanvas.Children.Add(_graphComponentService.HorizontalLineToLeftCanvas(i, branchDrawBuffer.Color));
         }
     }
 

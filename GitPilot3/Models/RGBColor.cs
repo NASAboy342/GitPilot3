@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Avalonia.Media;
 
 namespace GitPilot3.Models;
 
@@ -22,27 +23,63 @@ public class RGBColor
 
         public RGBColor GetRandomColor()
         {
-            var colorsTemplate = new List<RGBColor>
-            {
-                new RGBColor(174, 2, 37),
-                new RGBColor(159, 52, 5),
-                new RGBColor(42, 52, 149),
-                new RGBColor(1, 107, 49),
-                new RGBColor(165, 16, 20),
-                new RGBColor(125, 6, 121),
-                new RGBColor(83, 39, 139),
-                new RGBColor(155, 0, 65),
-                new RGBColor(3, 106, 92),
-                new RGBColor(2, 89, 140),
-                new RGBColor(178, 1, 1),
-                new RGBColor(159, 52, 5),
-            };
-
             var random = new Random();
-
-            var randomIndex = random.Next(0, colorsTemplate.Count);
-
-            var resultColor = colorsTemplate[randomIndex];
-            return resultColor;
+            
+            // Generate random hue (0-360)
+            double hue = random.Next(0, 360);
+            
+            // Set high saturation (75-100%) for vibrancy
+            double saturation = (random.Next(75, 101)) / 100.0;
+            
+            // Set high brightness (70-100%) for vibrancy
+            double brightness = (random.Next(70, 101)) / 100.0;
+            
+            // Convert HSB to RGB
+            return ConvertHsbToRgb(hue, saturation, brightness);
         }
+
+        private RGBColor ConvertHsbToRgb(double hue, double saturation, double brightness)
+        {
+            double c = brightness * saturation;
+            double x = c * (1 - Math.Abs((hue / 60) % 2 - 1));
+            double m = brightness - c;
+
+            double r, g, b;
+
+            if (hue < 60)
+            {
+                r = c; g = x; b = 0;
+            }
+            else if (hue < 120)
+            {
+                r = x; g = c; b = 0;
+            }
+            else if (hue < 180)
+            {
+                r = 0; g = c; b = x;
+            }
+            else if (hue < 240)
+            {
+                r = 0; g = x; b = c;
+            }
+            else if (hue < 300)
+            {
+                r = x; g = 0; b = c;
+            }
+            else
+            {
+                r = c; g = 0; b = x;
+            }
+
+            return new RGBColor(
+                (int)Math.Round((r + m) * 255),
+                (int)Math.Round((g + m) * 255),
+                (int)Math.Round((b + m) * 255)
+            );
+        }
+
+    internal IBrush ToAvaloniaColor()
+    {
+        return new SolidColorBrush(new Color((byte)255, (byte)R, (byte)G, (byte)B));
     }
+}

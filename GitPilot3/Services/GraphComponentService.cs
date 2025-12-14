@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Media;
+using GitPilot3.Models;
 
 namespace GitPilot3.Services;
 
@@ -11,35 +12,38 @@ public class GraphComponentService : IGraphComponentService
     public int Height { get; set; } = 40;
 
     private int _lineThickness = 3;
-    public Ellipse GetCommitPointCanvas(int index = 0, bool isAMergeCommit = false)
+    public Ellipse GetCommitPointCanvas(int index = 0, bool isAMergeCommit = false, RGBColor relativeColor = null)
     {
+        var x = Height / 2;
+        var y = Height / 2;
+
+        x = x + (index * Height);
+
         var circle = new Ellipse
         {
-            Width = Height * 0.8,
-            Height = Height * 0.8,
-            Fill = Brushes.DodgerBlue,
+            Width = Height * (isAMergeCommit ? 0.5 : 0.8),
+            Height = Height * (isAMergeCommit ? 0.5 : 0.8),
+            Fill = relativeColor.ToAvaloniaColor(),
         };
-        var margitLeft = index * circle.Width;
-        var adjustedMarginLeft = ((Height / 2) - (circle.Width / 2)) * index;
 
-        Canvas.SetLeft(circle, (Height / 2) - (circle.Width / 2) + margitLeft + adjustedMarginLeft);
-        Canvas.SetTop(circle, (Height / 2) - (circle.Height / 2));
+        Canvas.SetLeft(circle, x - (circle.Width / 2));
+        Canvas.SetTop(circle, y - (circle.Height / 2));
         return circle;
     }
 
-    public Line GetBranchLineCanvas(int index = 0)
+    public Line GetBranchLineCanvas(int index = 0, RGBColor color = null)
     {
-        index++;
-        var circle = GetCommitPointCanvas(index);
-        var adjustedMarginLeft = ((Height / 2) - (circle.Width / 2)) * index;
-        var startX = (circle.Width * index - circle.Width / 2) + adjustedMarginLeft;
+        var startX = Height / 2;
         var startY = 0;
-        var endX = (circle.Width * index - circle.Width / 2) + adjustedMarginLeft;
+        var endX = Height / 2;
         var endY = Height;
+
+        startX = startX + (index * Height);
+        endX = endX + (index * Height);
 
         var line = new Line
         {
-            Stroke = Brushes.DodgerBlue,
+            Stroke = color.ToAvaloniaColor(),
             StrokeThickness = _lineThickness,
             StartPoint = new Point(startX, startY),
             EndPoint = new Point(endX, endY),
@@ -47,19 +51,19 @@ public class GraphComponentService : IGraphComponentService
         return line;
     }
 
-    public Control GetLowerConnectorLineCanvas(int index = 0)
+    public Control GetLowerConnectorLineCanvas(int index = 0, RGBColor relativeColor = null)
     {
-        index++;
-        var circle = GetCommitPointCanvas(index);
-        var adjustedMarginLeft = ((Height / 2) - (circle.Width / 2)) * index;
-        var startX = (circle.Width * index - circle.Width / 2) + adjustedMarginLeft;
+        var startX = Height / 2;
         var startY = Height / 2;
-        var endX = (circle.Width * index - circle.Width / 2) + adjustedMarginLeft;
+        var endX = Height / 2;
         var endY = Height;
 
+        startX = startX + (index * Height);
+        endX = endX + (index * Height);
+
         var line = new Line
         {
-            Stroke = Brushes.DodgerBlue,
+            Stroke = relativeColor.ToAvaloniaColor(),
             StrokeThickness = _lineThickness,
             StartPoint = new Point(startX, startY),
             EndPoint = new Point(endX, endY),
@@ -67,19 +71,19 @@ public class GraphComponentService : IGraphComponentService
         return line;
     }
 
-    public Control GetUpperConnectorLineCanvas(int index = 0)
+    public Control GetUpperConnectorLineCanvas(int index = 0, RGBColor color = null)
     {
-        index++;
-        var circle = GetCommitPointCanvas(index);
-        var adjustedMarginLeft = ((Height / 2) - (circle.Width / 2)) * index;
-        var startX = (circle.Width * index - circle.Width / 2) + adjustedMarginLeft;
+        var startX = Height / 2;
         var startY = 0;
-        var endX = (circle.Width * index - circle.Width / 2) + adjustedMarginLeft;
+        var endX = Height / 2;
         var endY = Height / 2;
 
+        startX = startX + (index * Height);
+        endX = endX + (index * Height);
+        
         var line = new Line
         {
-            Stroke = Brushes.DodgerBlue,
+            Stroke = color.ToAvaloniaColor(),
             StrokeThickness = _lineThickness,
             StartPoint = new Point(startX, startY),
             EndPoint = new Point(endX, endY),
@@ -87,23 +91,25 @@ public class GraphComponentService : IGraphComponentService
         return line;
     }
 
-    public Control GetCheckOutCurveLineCanvas(int index = 0)
+    public Control GetCheckOutCurveLineCanvas(int index = 0, RGBColor color = null)
     {
-        index++;
-        var circle = GetCommitPointCanvas(index);
-        var adjustedMarginLeft = ((Height / 2) - (circle.Width / 2)) * index;
-        var startX = (circle.Width * index - circle.Width / 2) + adjustedMarginLeft;
+        
+        var startX = Height / 2;
         var startY = 0;
-        var controlX = (circle.Width * index - circle.Width / 2) + adjustedMarginLeft; ;
+        var controlX = Height / 2;
         var controlY = Height / 2;
-        var endX = (circle.Width * index - circle.Width) + (adjustedMarginLeft / 2);
+        var endX = 0;
         var endY = Height / 2;
+
+        startX = startX + (index * Height);
+        controlX = controlX + (index * Height);
+        endX = endX + (index * Height) - Convert.ToInt32(Height * 0.25);
+
         // Define a Path
         var path = new Path
         {
-            Stroke = Brushes.DodgerBlue,
+            Stroke = color.ToAvaloniaColor(),
             StrokeThickness = _lineThickness
-            
         };
 
         // Geometry: Move to (10,100), then quadratic Bezier to (200,100) with control point (100,10)
@@ -132,19 +138,19 @@ public class GraphComponentService : IGraphComponentService
         return path;
     }
 
-    public Control HorizontalLineCanvas(int index = 0)
+    public Control HorizontalLineToLeftCanvas(int index = 0, RGBColor color = null)
     {
-        index++;
-        var circle = GetCommitPointCanvas(index);
-        var adjustedMarginLeft = ((Height / 2) - (circle.Width / 2)) * index;
-        var startX = (circle.Width * index) + adjustedMarginLeft;
+        var startX = Height;
         var startY = Height / 2;
-        var endX = (circle.Width * index - circle.Width);
+        var endX = 0;
         var endY = Height / 2;
 
+        startX = startX + (index * Height);
+        endX = endX + (index * Height) - (Height / 2);
+
         var line = new Line
         {
-            Stroke = Brushes.DodgerBlue,
+            Stroke = color.ToAvaloniaColor(),
             StrokeThickness = _lineThickness,
             StartPoint = new Point(startX, startY),
             EndPoint = new Point(endX, endY),
@@ -152,19 +158,19 @@ public class GraphComponentService : IGraphComponentService
         return line;
     }
 
-    public Control GetBranchLineCanvasOnOtherRow(int index, int relativeRow)
+    public Control HorizontalLineToRightCanvas(int index = 0, RGBColor color = null)
     {
-        index++;
-        var circle = GetCommitPointCanvas(index);
-        var adjustedMarginLeft = ((Height / 2) - (circle.Width / 2)) * index;
-        var startX = (circle.Width * index - circle.Width / 2) + adjustedMarginLeft;
-        var startY = 0 + (Height * relativeRow);
-        var endX = (circle.Width * index - circle.Width / 2) + adjustedMarginLeft;
-        var endY = Height + (Height * relativeRow) + adjustedMarginLeft;
+        var startX = Height;
+        var startY = Height / 2;
+        var endX = 0;
+        var endY = Height / 2;
+
+        startX = startX + (index * Height) + (Height / 2);
+        endX = endX + (index * Height);
 
         var line = new Line
         {
-            Stroke = Brushes.DodgerBlue,
+            Stroke = color.ToAvaloniaColor(),
             StrokeThickness = _lineThickness,
             StartPoint = new Point(startX, startY),
             EndPoint = new Point(endX, endY),
@@ -172,22 +178,43 @@ public class GraphComponentService : IGraphComponentService
         return line;
     }
 
-    public Control GetMergeCurveLineOnOtherRowCanvas(int index, int relativeRow, int mergeToIndex)
+    public Control GetBranchLineCanvasOnOtherRow(int index, int relativeRow, RGBColor color)
+    {
+        var line = GetBranchLineCanvas(index, color);
+        line.StartPoint = new Point(line.StartPoint.X, line.StartPoint.Y + (Height * relativeRow));
+        line.EndPoint = new Point(line.EndPoint.X, line.EndPoint.Y + (Height * relativeRow) + (Height / 2));
+        return line;
+    }
+
+    public Control GetMergeCurveLineOnOtherRowCanvas(int index, int relativeRow, int mergeToIndex, RGBColor color = null)
     {
         var isMergeToRight = mergeToIndex > index;
-        index++;
-        var circle = GetCommitPointCanvas(index);
-        var adjustedMarginLeft = ((Height / 2) - (circle.Width / 2)) * index;
-        var startX = (circle.Width * index - circle.Width / 2) + adjustedMarginLeft;
-        var startY =  (Height * relativeRow) + Height + (adjustedMarginLeft / 2);
-        var controlX = (circle.Width * index - circle.Width / 2) + adjustedMarginLeft; ;
-        var controlY = Height / 2 + (Height * relativeRow);
-        var endX = (circle.Width * index - (isMergeToRight ? 0 : circle.Width)) + (adjustedMarginLeft * (isMergeToRight ? 2 : 0.5));
-        var endY = Height / 2 + (Height * relativeRow);
+        
+        var startX = Height / 2;
+        var startY = Height;
+        var controlX = Height / 2;
+        var controlY = Height / 2;
+        var endX = isMergeToRight ? Height : 0;
+        var endY = Height / 2;
+
+        startX = startX + (index * Height);
+        startY = startY + (relativeRow * Height);
+
+        controlX = controlX + (index * Height);
+        controlY = controlY + (relativeRow * Height);
+
+        if(isMergeToRight)
+            endX = endX + (index * Height) + Convert.ToInt32(Height * 0.25);
+        else
+            endX = endX + (index * Height) - Convert.ToInt32(Height * 0.25);
+            
+        endY = endY + (relativeRow * Height);
+        
+        
         // Define a Path
         var path = new Path
         {
-            Stroke = Brushes.DodgerBlue,
+            Stroke = color.ToAvaloniaColor(),
             StrokeThickness = _lineThickness
             
         };
@@ -218,23 +245,21 @@ public class GraphComponentService : IGraphComponentService
         return path;
     }
 
-    public Control HorizontalLineOnOtherRowCanvas(int index, int relativeRow)
+    public Control HorizontalLineToLeftOnOtherRowCanvas(int index, int relativeRow, RGBColor color)
     {
-        index++;
-        var circle = GetCommitPointCanvas(index);
-        var adjustedMarginLeft = ((Height / 2) - (circle.Width / 2)) * index;
-        var startX = (circle.Width * index) + adjustedMarginLeft;
-        var startY = (Height / 2) + (Height * relativeRow);
-        var endX = (circle.Width * index - circle.Width);
-        var endY = (Height / 2) + (Height * relativeRow);
+        var line = (Line)HorizontalLineToLeftCanvas(index, color);
+        line.StartPoint = new Point(line.StartPoint.X, line.StartPoint.Y + (Height * relativeRow));
+        line.EndPoint = new Point(line.EndPoint.X, line.EndPoint.Y + (Height * relativeRow));
 
-        var line = new Line
-        {
-            Stroke = Brushes.DodgerBlue,
-            StrokeThickness = _lineThickness,
-            StartPoint = new Point(startX, startY),
-            EndPoint = new Point(endX, endY),
-        };
+        return line;
+    }
+
+    public Control HorizontalLineToRightOnOtherRowCanvas(int index, int relativeRow, RGBColor color)
+    {
+        var line = (Line)HorizontalLineToRightCanvas(index, color);
+        line.StartPoint = new Point(line.StartPoint.X, line.StartPoint.Y + (Height * relativeRow));
+        line.EndPoint = new Point(line.EndPoint.X, line.EndPoint.Y + (Height * relativeRow));
+
         return line;
     }
 }

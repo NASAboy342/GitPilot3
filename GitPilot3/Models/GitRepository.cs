@@ -13,4 +13,5 @@ public class GitRepository
     public List<GitBranch> RemoteBranches { get; set; } = new List<GitBranch>();
     public List<GitCommit> Commits { get; set; } = new List<GitCommit>();
     public GitCommitDetail CommitDetail { get; set; } = new GitCommitDetail();
+    public bool IsAutoRefreshDisabled { get; set; } = false;
 }

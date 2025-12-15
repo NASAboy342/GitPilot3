@@ -275,11 +275,6 @@ public partial class MainWindow : Window
         }
     }
 
-    // Event handlers for menu items and toolbar buttons
-    private void OnCloneRepository(object sender, RoutedEventArgs e)
-    {
-        // TODO: Implement clone repository dialog
-    }
 
     private async void OnOpenRepository(object sender, RoutedEventArgs e)
     {
@@ -687,7 +682,8 @@ public partial class MainWindow : Window
                 VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
                 Height = 20,
                 Width = 20,
-                Padding = new Avalonia.Thickness(5, 0, 5, 0)
+                Padding = new Avalonia.Thickness(5, 0, 5, 0),
+                Margin = new Avalonia.Thickness(0, 0, 10, 0)
             };
 
             unstageFileButton.Click += async (sender, e) =>
@@ -802,7 +798,8 @@ public partial class MainWindow : Window
                     VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
                     Height = 20,
                     Width = 20,
-                    Padding = new Avalonia.Thickness(5, 0, 5, 0)
+                    Padding = new Avalonia.Thickness(5, 0, 5, 0),
+                    Margin = new Avalonia.Thickness(0, 0, 10, 0)
                 };
                 DockPanel.SetDock(stagedFileButton, Dock.Right);
                 stagedFileButton.Click += async (sender, e) =>
@@ -1554,6 +1551,56 @@ public partial class MainWindow : Window
             {
                 await LoadProfileInfoDisplay();
             };
+        }
+    }
+
+    private void OnCloneRepository(object sender, RoutedEventArgs e)
+    {
+        var newWindow = new Window
+        {
+            Title = "Clone Repository",
+            Width = 500,
+            Height = 100,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var commontInput = new CommonSimpleInput();
+        commontInput.PlaceHolderText = "Enter repository clone URL";
+        newWindow.Content = commontInput;
+        commontInput.OnCancelClicked += (ss, ee) =>
+        {
+            newWindow.Close();
+        };
+        commontInput.OnOkClicked += async (ss, ee) =>
+        {
+            newWindow.Close();
+            await CloneRepository(commontInput.InputText);
+        };
+        newWindow.ShowDialog(this);
+    }
+
+    private async Task CloneRepository(string url)
+    {
+        try
+        {
+            _gitRepositoryService.ValidateGitRepositoryUrl(url);
+            var currentUserProfile = await _userProfileService.GetCurrentUserProfileAsync();
+            var localPath = await _folderPicker.ShowDialogAsync();
+            if (string.IsNullOrEmpty(localPath))
+                throw new Exception("No local path selected for cloning.");
+            localPath = await _gitRepositoryService.CloneRepositoryAsync(url, localPath, currentUserProfile);
+            CurrentRepository = await _gitRepositoryService.LoadRepositoryAsync(localPath);
+            CurrentRepository.RemoteBranches = await _gitRepositoryService.GetRemoteBranchesAsync(localPath);
+            CurrentRepository.LocalBranches = await _gitRepositoryService.GetLocalBranchesAsync(localPath);
+            CurrentRepository.Commits = await _gitRepositoryService.GetCommitsAsync(localPath);
+            UpdateCurrentRepositoryDisplay();
+            _appStageService.SaveCurrentRepository(CurrentRepository);
+            InitializeGitWatcher();
+            AddSuccessCard($"Repository cloned to: {localPath} successfully.");
+        }
+        catch (Exception ex)
+        {
+            AddErrorCard(ex.Message);
+            return;
         }
     }
 }

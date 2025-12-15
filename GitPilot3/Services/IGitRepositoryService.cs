@@ -26,4 +26,6 @@ public interface IGitRepositoryService
     Task PublishBranchAsync(string path, GitRepository currentRepository, UserProfile userProfile);
     Task MergeBranchAsync(GitRepository currentRepository, string name, UserProfile userProfile);
     Task DeleteLocalBranchAsync(string path, string name);
+    Task<string> CloneRepositoryAsync(string url, string localPath, UserProfile currentUserProfile);
+    void ValidateGitRepositoryUrl(string url);
 }

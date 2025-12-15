@@ -50,7 +50,7 @@
                         <ColumnDefinition Width="300"/>
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="10,0" VerticalAlignment="Center" HorizontalAlignment="Left">
-                        <Button Classes="Secondary" Content="Clone" />
+                        <Button Classes="Secondary" Content="Clone" Click="OnCloneRepository"/>
                         <Button Classes="Secondary" Content="Open" Click="OnOpenRepository"/>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="10,0" VerticalAlignment="Center" HorizontalAlignment="Center">

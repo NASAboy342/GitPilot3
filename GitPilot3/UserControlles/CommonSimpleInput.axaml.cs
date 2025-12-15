@@ -20,6 +20,10 @@ public partial class CommonSimpleInput : UserControl
         get => InputTextBox.Watermark?.ToString() ?? string.Empty;
         set => InputTextBox.Watermark = value;
     }
+    /// <summary>
+    /// Creates a simple input dialog with OK and Cancel buttons.
+    /// Best supported with Width="500" Height="100"
+    /// </summary>
     public CommonSimpleInput()
     {
         InitializeComponent();

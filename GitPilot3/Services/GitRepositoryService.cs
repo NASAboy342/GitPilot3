@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using GitPilot3.Models;
@@ -422,4 +423,33 @@ public class GitRepositoryService : IGitRepositoryService
         libgitRepository.Branches.Remove(branch);
         return Task.CompletedTask;
     }
+
+    public async Task<string> CloneRepositoryAsync(string url, string localPath, UserProfile currentUserProfile)
+    {
+        var options = new CloneOptions(
+            new FetchOptions
+            {
+                CredentialsProvider = (_url, _user, _cred) =>
+                    new UsernamePasswordCredentials
+                    {
+                        Username = currentUserProfile.Username,
+                        Password = currentUserProfile.Password
+                    }
+            }
+        );
+        var repoFolder = GetRepositoryNameFromPath(url).Replace(".git", "");
+        var fullPath = Path.Combine(localPath, repoFolder);
+        Repository.Clone(url, fullPath, options);
+        return fullPath;
+    }
+
+    public void ValidateGitRepositoryUrl(string url)
+    {
+        if (string.IsNullOrEmpty(url) || 
+            !(url.StartsWith("http://") || url.StartsWith("https://") || url.StartsWith("git@") || url.StartsWith("ssh://")))
+        {
+            throw new ArgumentException("Invalid Git repository URL.");
+        }
+    }
+
 }

@@ -67,7 +67,7 @@ public class GitRepositoryService : IGitRepositoryService
         var libgitRepository = new Repository(repositoryPath);
         var gitRepository = new GitRepository
         {
-            Name = GetRepositoryNameFromPath(repositoryPath),
+            Name = libgitRepository.Info.WorkingDirectory != null ? GetRepositoryNameFromPath(libgitRepository.Info.WorkingDirectory) : "Unknown Repository",
             Path = libgitRepository.Info.Path
         };
         return gitRepository;

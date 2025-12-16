@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using GitPilot3.Models;
 using GitPilot3.Repositories;
 
@@ -23,11 +24,37 @@ public class AppStageService : IAppStageService
     {
         var appStage = GetAppStage();
         appStage.CurrentRepository = currentRepository;
+        UpdateLastOpenedRepository(appStage, currentRepository);
         _appRepository.SaveAppStage(appStage);
+    }
+
+    private void UpdateLastOpenedRepository(AppStage appStage, GitRepository currentRepository)
+    {
+        if (currentRepository == null) return;
+        var openedRepo = appStage.OpenedRepositories.Find(r => r.Path == currentRepository.Path);;
+        if (openedRepo != null)
+        {
+            openedRepo.LastOpened = DateTime.Now;
+        }
+        else
+        {
+            appStage.OpenedRepositories.Add(new OpenedRepository
+            {
+                Path = currentRepository.Path,
+                Name = currentRepository.Name,
+                LastOpened = DateTime.Now
+            });
+        }
     }
 
     private AppStage GetAppStage()
     {
         return _appRepository.GetAppStage();
+    }
+
+    public List<OpenedRepository> GetAllOpenedRepositories()
+    {
+        var appStage = GetAppStage();
+        return appStage.OpenedRepositories ?? new List<OpenedRepository>();
     }
 }

@@ -32,6 +32,7 @@ public partial class MainWindow : Window
     private readonly ErrorMessageHandler _errorMessageHandler;
     private FileSystemWatcher? _fileSystemWatcher;
     private IGraphComponentService _graphComponentService;
+    private EventHandler OnRepositoryOpenedSuccessfully;
 
     public MainWindow(IUserProfileService userProfileService,
     IGitRepositoryService gitRepositoryService,
@@ -114,7 +115,7 @@ public partial class MainWindow : Window
         };
 
         await Task.WhenAll(tasks);
-        
+
         UpdateLocalBranches(localBranches);
         UpdateRemoteBranches(remoteBranches);
         UpdateCurrentRepositoryDisplay();
@@ -220,11 +221,78 @@ public partial class MainWindow : Window
                 return;
             CurrentRepository = lastRepository;
             UpdateCurrentRepositoryDisplay();
+            UpdateRepositoryComboBox();
         }
         catch (Exception ex)
         {
             AddErrorCard(ex.Message);
         }
+    }
+
+    private void UpdateRepositoryComboBox()
+    {
+        var openedRepositories = _appStageService.GetAllOpenedRepositories().OrderByDescending(r => r.LastOpened).ToList();
+
+        if (OpenedRepositoriesPanel == null) return;
+
+        OpenedRepositoriesPanel.Children.Clear();
+
+        var searchableSelection = new SearchableSelection
+        {
+            Width = 200,
+            Height = 25,
+            Items = openedRepositories.OrderByDescending(r => r.LastOpened).Select(r => r.Name).ToList(),
+            SelectedItem = CurrentRepository.Name
+        };
+        OnNewRepoIsOpent(searchableSelection);
+        OnSelectedRepoChanged(openedRepositories, searchableSelection);
+
+        OpenedRepositoriesPanel.Children.Add(searchableSelection);
+    }
+
+    private void OnNewRepoIsOpent(SearchableSelection searchableSelection)
+    {
+
+        OnRepositoryOpenedSuccessfully += async (s, e) =>
+        {
+            try
+            {
+                var openedRepositories = _appStageService.GetAllOpenedRepositories().OrderByDescending(r => r.LastOpened).ToList();
+                searchableSelection.SelectedItem = CurrentRepository.Name;
+                searchableSelection.Items = openedRepositories.OrderByDescending(r => r.LastOpened).Select(r => r.Name).ToList();
+            }
+            catch (Exception ex)
+            {
+                AddErrorCard(ex.Message);
+            }
+        };
+    }
+
+    private void OnSelectedRepoChanged(List<OpenedRepository> openedRepositories, SearchableSelection searchableSelection)
+    {
+        searchableSelection.SelectedItemChanged += async (s, e) =>
+        {
+            try
+            {
+                var selectedRepoName = searchableSelection.SelectedItem;
+                var selectedOpenedRepo = openedRepositories.FirstOrDefault(r => r.Name.Equals(selectedRepoName, StringComparison.OrdinalIgnoreCase));
+                if (selectedOpenedRepo == null)
+                    return;
+                CurrentRepository = await _gitRepositoryService.LoadRepositoryAsync(selectedOpenedRepo.Path);
+                CurrentRepository.RemoteBranches = await _gitRepositoryService.GetRemoteBranchesAsync(selectedOpenedRepo.Path);
+                CurrentRepository.LocalBranches = await _gitRepositoryService.GetLocalBranchesAsync(selectedOpenedRepo.Path);
+                CurrentRepository.Commits = await _gitRepositoryService.GetCommitsAsync(selectedOpenedRepo.Path);
+                UpdateCurrentRepositoryDisplay();
+                _appStageService.SaveCurrentRepository(CurrentRepository);
+                InitializeGitWatcher();
+                AddSuccessCard($"Switched to repository: {CurrentRepository.Name}.");
+            }
+            catch (Exception ex)
+            {
+                _errorMessageHandler.ShowErrorMessage("Failed to switch repository: " + ex.Message);
+                return;
+            }
+        };
     }
 
     private async Task LoadProfileInfoDisplay()
@@ -290,6 +358,7 @@ public partial class MainWindow : Window
             UpdateCurrentRepositoryDisplay();
             _appStageService.SaveCurrentRepository(CurrentRepository);
             InitializeGitWatcher();
+            OnRepositoryOpenedSuccessfully?.Invoke(this, EventArgs.Empty);
             AddSuccessCard($"Repository: {CurrentRepository.Name} loaded successfully.");
         }
         catch (Exception ex)

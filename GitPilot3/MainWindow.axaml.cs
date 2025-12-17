@@ -1739,6 +1739,7 @@ public partial class MainWindow : Window
             CurrentRepository.Commits = await _gitRepositoryService.GetCommitsAsync(localPath);
             UpdateCurrentRepositoryDisplay();
             _appStageService.SaveCurrentRepository(CurrentRepository);
+            OnRepositoryOpenedSuccessfully?.Invoke(this, EventArgs.Empty);
             InitializeGitWatcher();
             AddSuccessCard($"Repository cloned to: {localPath} successfully.");
         }

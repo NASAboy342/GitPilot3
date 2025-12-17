@@ -859,36 +859,112 @@ public partial class MainWindow : Window
 
             if (CurrentRepository.CommitDetail.Commit.IsWorkInProgress)
             {
-                var stagedFileButton = new Button
-                {
-                    Content = "+",
-                    Foreground = Brushes.White,
-                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-                    Height = 20,
-                    Width = 20,
-                    Padding = new Avalonia.Thickness(5, 0, 5, 0),
-                    Margin = new Avalonia.Thickness(0, 0, 10, 0)
-                };
-                DockPanel.SetDock(stagedFileButton, Dock.Right);
-                stagedFileButton.Click += async (sender, e) =>
-                {
-                    await StageFilesAsync(new List<string> { fileChange.FilePath });
-                };
+                var stagedFileButton = GetStageFileButton(fileChange);
                 fileChangeItem.Children.Add(stagedFileButton);
+                var discardFileButton = GetDiscardFileButton(fileChange);
+                fileChangeItem.Children.Add(discardFileButton);
             }
 
             fileChangesStackPanel.Children.Add(fileChangeItem);
         }
     }
 
+    private Button GetDiscardFileButton(GitCommitFileChange fileChange)
+    {
+        var discardFileButton = new Button
+        {
+            Content = "-",
+            Foreground = Brushes.White,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            Height = 20,
+            Width = 20,
+            Padding = new Avalonia.Thickness(5, 0, 5, 0),
+            Margin = new Avalonia.Thickness(0, 0, 10, 0)
+        };
+        DockPanel.SetDock(discardFileButton, Dock.Right);
+        discardFileButton.Click += async (sender, e) =>
+        {
+            var newWindow = new Window
+            {
+                Title = "Clone Repository",
+                Width = 500,
+                Height = 100,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            };
+            var commonConfirmation = new CommonConfirmation()
+            {
+                Message = $"Are you sure you want to discard changes in file: {fileChange.FileName}?",
+            };
+            newWindow.Content = commonConfirmation;
+            commonConfirmation.OnCancelClicked += (s, e) =>
+            {
+                newWindow.Close();
+            };
+            commonConfirmation.OnYesClicked += async (s, e) =>
+            {
+                await DiscardFileAsync(new List<string> { fileChange.FilePath });
+                newWindow.Close();
+            };
+            newWindow.ShowDialog(this);
+        };
+        return discardFileButton;
+    }
+
+    private async Task DiscardFileAsync(List<string> unstageFilePaths)
+    {
+        try
+        {
+            if (CurrentRepository.CommitDetail.Commit.IsWorkInProgress)
+            {
+                await _gitRepositoryService.DiscardFilesAsync(CurrentRepository.Path, unstageFilePaths);
+                await ShowCommitDetails(CurrentRepository.CommitDetail.Commit);
+            }
+        }
+        catch (Exception ex)
+        {
+            AddErrorCard("Failed to discard files: " + ex.Message);
+            return;
+        }
+    }
+
+    private Button GetStageFileButton(GitCommitFileChange fileChange)
+    {
+        var stagedFileButton = new Button
+        {
+            Content = "+",
+            Foreground = Brushes.White,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            Height = 20,
+            Width = 20,
+            Padding = new Avalonia.Thickness(5, 0, 5, 0),
+            Margin = new Avalonia.Thickness(0, 0, 10, 0)
+        };
+        DockPanel.SetDock(stagedFileButton, Dock.Right);
+        stagedFileButton.Click += async (sender, e) =>
+        {
+            await StageFilesAsync(new List<string> { fileChange.FilePath });
+        };
+        return stagedFileButton;
+    }
+
     private async Task StageFilesAsync(List<string> unstageFilePaths)
     {
-        if (CurrentRepository.CommitDetail.Commit.IsWorkInProgress)
+        try
         {
-            await _gitRepositoryService.StageFilesAsync(CurrentRepository.Path, unstageFilePaths);
-            await ShowCommitDetails(CurrentRepository.CommitDetail.Commit);
+            if (CurrentRepository.CommitDetail.Commit.IsWorkInProgress)
+            {
+                await _gitRepositoryService.StageFilesAsync(CurrentRepository.Path, unstageFilePaths);
+                await ShowCommitDetails(CurrentRepository.CommitDetail.Commit);
+            }
         }
+        catch (Exception ex)
+        {
+            AddErrorCard("Failed to stage files: " + ex.Message);
+            return;
+        }
+
     }
 
     private async Task ShowFileChangeDetail(GitCommitFileChange fileChange)

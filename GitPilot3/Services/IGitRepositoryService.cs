@@ -28,4 +28,5 @@ public interface IGitRepositoryService
     Task DeleteLocalBranchAsync(string path, string name);
     Task<string> CloneRepositoryAsync(string url, string localPath, UserProfile currentUserProfile);
     void ValidateGitRepositoryUrl(string url);
+    Task DiscardFilesAsync(string path, List<string> unstageFilePaths);
 }

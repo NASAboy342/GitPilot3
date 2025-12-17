@@ -452,4 +452,9 @@ public class GitRepositoryService : IGitRepositoryService
         }
     }
 
+    public async Task DiscardFilesAsync(string path, List<string> unstageFilePaths)
+    {
+        var libgitRepository = new Repository(path);
+        libgitRepository.CheckoutPaths(libgitRepository.Head.FriendlyName, unstageFilePaths, new CheckoutOptions{ CheckoutModifiers = CheckoutModifiers.Force });
+    }
 }

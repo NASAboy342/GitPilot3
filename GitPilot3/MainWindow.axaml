@@ -4,7 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="800"
         x:Class="GitPilot3.MainWindow"
-        Title="GitPilot3 - Git Client"
+        Title="GitPilot3"
         MinWidth="1000" MinHeight="600"
         WindowStartupLocation="CenterScreen">
 

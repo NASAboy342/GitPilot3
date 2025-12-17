@@ -6,6 +6,7 @@
         <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+        <ApplicationIcon>GitPilot3.ico</ApplicationIcon>
     </PropertyGroup>
 
     <ItemGroup>
@@ -23,5 +24,17 @@
         <PackageReference Include="LibGit2Sharp" Version="0.31.0" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.10" />
         <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Update="GitPilot3.png">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="GitPilot3.ico">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="GitPilot3.icns">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
     </ItemGroup>
 </Project>

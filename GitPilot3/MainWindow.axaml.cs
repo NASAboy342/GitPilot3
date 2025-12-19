@@ -1001,25 +1001,39 @@ public partial class MainWindow : Window
         };
 
         var lines = fileChange.DiffContent.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+        var selectableTextBlock = new SelectableTextBlock
+            {
+                FontFamily = new FontFamily("Consolas, 'Courier New', monospace"),
+                FontSize = 16,
+            };
+        
         foreach (var line in lines)
         {
             var lineColor = Brushes.White;
+            var backgroundColor = Brushes.Transparent;
             if (line.StartsWith("+"))
             {
                 lineColor = Brushes.LightGreen;
+                backgroundColor = (IImmutableSolidColorBrush)new SolidColorBrush(Color.FromRgb(30, 50, 30), 0.5).ToImmutable();
+                
             }
             else if (line.StartsWith("-"))
             {
                 lineColor = Brushes.IndianRed;
+                backgroundColor = (IImmutableSolidColorBrush)new SolidColorBrush(Color.FromRgb(50, 30, 30), 0.5).ToImmutable();
             }
-            stackPanel.Children.Add(new TextBlock
+            
+            selectableTextBlock.Inlines.Add(new Run
             {
-                Text = line,
-                FontFamily = new FontFamily("Consolas, 'Courier New', monospace"),
-                FontSize = 12,
-                Foreground = lineColor
+                Text = line + Environment.NewLine,
+                Foreground = lineColor,
+                Background = backgroundColor,
             });
+            
         }
+
+        stackPanel.Children.Add(selectableTextBlock);
 
         return stackPanel;
     }

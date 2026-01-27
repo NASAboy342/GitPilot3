@@ -63,8 +63,8 @@
                         <Rectangle Width="1" Height="20" Fill="{StaticResource BorderLightBrush}" Margin="5,0"/>
                         <Button Classes="Secondary Toolbar" Content="Branch" Click="OnClickCreateBranchOnToolBar"/>
                         <Rectangle Width="1" Height="20" Fill="{StaticResource BorderLightBrush}" Margin="5,0"/>
-                        <Button Classes="Secondary Toolbar" Content="Stash" />
-                        <Button Classes="Secondary Toolbar" Content="Pop" />
+                        <Button Classes="Secondary Toolbar" Content="Stash" Click="OnStash"/>
+                        <Button Classes="Secondary Toolbar" Content="Pop" Click="OnPop"/>
                     </StackPanel>
                     <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="10,0" VerticalAlignment="Center" HorizontalAlignment="Right">
                         <Button x:Name="ProfileButton" Classes="Secondary Toolbar" Content="Profile" Click="OnOpenProfile"/>
@@ -184,7 +184,10 @@
 
                         <!-- Commit Details Header -->
                         <Border Classes="Header" Grid.Row="0">
-                            <TextBlock x:Name="CommitDetailsHeader" Classes="H6" Text="Commit Details" HorizontalAlignment="Center"/>
+                            <StackPanel x:Name="CommitDetailsHeaderPanel" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock x:Name="CommitDetailsHeader" Classes="H6" Text="Commit Details" HorizontalAlignment="Center"/>
+                                <Button x:Name="CopyCommitShaButton" Classes="Secondary Small" Content="📋" HorizontalAlignment="Center" Margin="10,0,0,0" IsVisible="false" Click="OnCopyCommitShaButtonClick"/>
+                            </StackPanel>
                         </Border>
 
                         <!-- Commit Information -->

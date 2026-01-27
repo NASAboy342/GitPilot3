@@ -1003,11 +1003,11 @@ public partial class MainWindow : Window
         var lines = fileChange.DiffContent.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
         var selectableTextBlock = new SelectableTextBlock
-            {
-                FontFamily = new FontFamily("Consolas, 'Courier New', monospace"),
-                FontSize = 16,
-            };
-        
+        {
+            FontFamily = new FontFamily("Consolas, 'Courier New', monospace"),
+            FontSize = 16,
+        };
+
         foreach (var line in lines)
         {
             var lineColor = Brushes.White;
@@ -1016,21 +1016,21 @@ public partial class MainWindow : Window
             {
                 lineColor = Brushes.LightGreen;
                 backgroundColor = (IImmutableSolidColorBrush)new SolidColorBrush(Color.FromRgb(30, 50, 30), 0.5).ToImmutable();
-                
+
             }
             else if (line.StartsWith("-"))
             {
                 lineColor = Brushes.IndianRed;
                 backgroundColor = (IImmutableSolidColorBrush)new SolidColorBrush(Color.FromRgb(50, 30, 30), 0.5).ToImmutable();
             }
-            
+
             selectableTextBlock.Inlines.Add(new Run
             {
                 Text = line + Environment.NewLine,
                 Foreground = lineColor,
                 Background = backgroundColor,
             });
-            
+
         }
 
         stackPanel.Children.Add(selectableTextBlock);
@@ -1195,14 +1195,33 @@ public partial class MainWindow : Window
 
     private void UpdateCommitDetailsHeaderView()
     {
-        var commitDetailsHeader = this.FindControl<TextBlock>("CommitDetailsHeader");
-        if (commitDetailsHeader == null)
-            return;
-
         var commitSha = CurrentRepository.CommitDetail?.Commit.Sha ?? "";
         commitSha = commitSha.Length > 7 ? commitSha.Substring(0, 7) : commitSha;
+        CommitDetailsHeader.Text = "commit: " + commitSha;
+        CheckIfNeedToShowCopyButton(commitSha);
+    }
 
-        commitDetailsHeader.Text = "commit: " + commitSha;
+    private void CheckIfNeedToShowCopyButton(string commitSha)
+    {
+        var isHaveCommitSha = !string.IsNullOrEmpty(commitSha);
+        if (isHaveCommitSha)
+            CopyCommitShaButton.IsVisible = true;
+        else
+            CopyCommitShaButton.IsVisible = false;
+    }
+
+    private async void OnCopyCommitShaButtonClick(object? sender, RoutedEventArgs e)
+    {
+        var commitSha = CurrentRepository.CommitDetail?.Commit.Sha ?? "";
+        if (!string.IsNullOrEmpty(commitSha))
+        {
+            await TopLevel.GetTopLevel(this)!.Clipboard!.SetTextAsync(commitSha);
+            AddSuccessCard($"Copied commit SHA to clipboard. '{commitSha}'");
+        }
+        else
+        {
+            AddErrorCard("No commit SHA to copy.");
+        }
     }
 
     private Border? GetGraphHeaderItem(string headerName)
@@ -1762,5 +1781,73 @@ public partial class MainWindow : Window
             AddErrorCard(ex.Message);
             return;
         }
+    }
+
+    private void OnStash(object sender, RoutedEventArgs e)
+    {
+        var newWindow = new Window
+        {
+            Title = "Stash Changes",
+            Width = 500,
+            Height = 100,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var commonConfirmation = new CommonConfirmation();
+        commonConfirmation.Message = "Are you sure you want to stash all uncommitted changes?";
+        commonConfirmation.OnCancelClicked += (o, e) =>
+        {
+            newWindow.Close();
+        };
+        commonConfirmation.OnYesClicked += async (o, e) =>
+        {
+            newWindow.Close();
+            try
+            {
+                var userProfile = await _userProfileService.GetCurrentUserProfileAsync();
+                await _gitRepositoryService.StashChanges(CurrentRepository.Path, userProfile);
+                await SyncRepository();
+                AddSuccessCard("All uncommitted changes have been stashed successfully.");
+            }
+            catch (Exception ex)
+            {
+                AddErrorCard(ex.Message);
+                return;
+            }
+        };
+        newWindow.Content = commonConfirmation;
+        newWindow.Show(this);
+    }
+    private void OnPop(Object Sender, RoutedEventArgs e)
+    {
+        var newWindow = new Window
+        {
+            Title = "Pop Stashed Changes",
+            Width = 500,
+            Height = 100,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var commonConfirmation = new CommonConfirmation();
+        commonConfirmation.Message = "Are you sure you want to pop the latest stashed changes?";
+        commonConfirmation.OnCancelClicked += (o, e) =>
+        {
+            newWindow.Close();
+        };
+        commonConfirmation.OnYesClicked += async (o, e) =>
+        {
+            newWindow.Close();
+            try
+            {
+                await _gitRepositoryService.PopLastStashChanges(CurrentRepository.Path);
+                await SyncRepository();
+                AddSuccessCard("The latest stashed changes have been popped successfully.");
+            }
+            catch (Exception ex)
+            {
+                AddErrorCard(ex.Message);
+                return;
+            }
+        };
+        newWindow.Content = commonConfirmation;
+        newWindow.Show(this);
     }
 }

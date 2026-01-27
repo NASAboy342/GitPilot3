@@ -14,6 +14,9 @@ public partial class CommonConfirmation : UserControl
         get => MessageTextBlock.Text ?? string.Empty;
         set => MessageTextBlock.Text = value;
     }
+    /// <summary>
+    /// Works best when used Width = 500
+    /// </summary>
     public CommonConfirmation()
     {
         InitializeComponent();

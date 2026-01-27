@@ -457,4 +457,22 @@ public class GitRepositoryService : IGitRepositoryService
         var libgitRepository = new Repository(path);
         libgitRepository.CheckoutPaths(libgitRepository.Head.FriendlyName, unstageFilePaths, new CheckoutOptions{ CheckoutModifiers = CheckoutModifiers.Force });
     }
+
+    public async Task StashChanges(string path, UserProfile userProfile)
+    {
+        var libgitRepository = new Repository(path);
+        var signature = new Signature(userProfile.Username, userProfile.Email, DateTimeOffset.Now);
+        var message = "Stash by " + userProfile.Username + " at " + DateTimeOffset.Now.ToString("u");
+        libgitRepository.Stashes.Add(signature, message, StashModifiers.IncludeUntracked);
+    }
+
+    public async Task PopLastStashChanges(string path)
+    {
+        var libgitRepository = new Repository(path);
+        if (libgitRepository.Stashes.Count() == 0)
+        {
+            throw new InvalidOperationException("No stashes to pop.");
+        }
+        libgitRepository.Stashes.Pop(0);
+    }
 }

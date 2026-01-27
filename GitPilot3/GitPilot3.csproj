@@ -37,4 +37,13 @@
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
     </ItemGroup>
+
+    <ItemGroup>
+      <AvaloniaResource Include="Assets\**"/>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Assets/" />
+      <Folder Include="Assets/Icons/" />
+    </ItemGroup>
 </Project>

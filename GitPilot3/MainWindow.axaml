@@ -186,7 +186,9 @@
                         <Border Classes="Header" Grid.Row="0">
                             <StackPanel x:Name="CommitDetailsHeaderPanel" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <TextBlock x:Name="CommitDetailsHeader" Classes="H6" Text="Commit Details" HorizontalAlignment="Center"/>
-                                <Button x:Name="CopyCommitShaButton" Classes="Secondary Small" Content="📋" HorizontalAlignment="Center" Margin="10,0,0,0" IsVisible="false" Click="OnCopyCommitShaButtonClick"/>
+                                <Button x:Name="CopyCommitShaButton" Classes="Secondary Small" HorizontalAlignment="Center" Margin="10,0,0,0" IsVisible="false" Click="OnCopyCommitShaButtonClick">
+                                    <Image Width="16" Height="16" Source="/Assets/Icons/copy.png" />
+                                </Button>
                             </StackPanel>
                         </Border>
 

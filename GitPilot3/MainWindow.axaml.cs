@@ -17,6 +17,9 @@ using System.Runtime.InteropServices;
 using System.IO;
 using Avalonia.Threading;
 using GitPilot3.Models.Graph;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
+using GitPilot3.Helpers;
 
 namespace GitPilot3;
 
@@ -709,9 +712,11 @@ public partial class MainWindow : Window
 
                 Children =
                     {
-                        new TextBlock
+                        new Image
                         {
-                            Text = GetChangeTypeSymbol(fileChange.ChangeType),
+                            Height = 10,
+                            Width = 10,
+                            Source = GetChangeTypeIcon(fileChange.ChangeType),
                             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
                             Margin = new Avalonia.Thickness(5, 0, 0, 0)
                         },
@@ -822,9 +827,11 @@ public partial class MainWindow : Window
                 Classes = { "fileChangeBorder" },
                 Children =
                     {
-                        new TextBlock
+                        new Image
                         {
-                            Text = GetChangeTypeSymbol(fileChange.ChangeType),
+                            Height = 10,
+                            Width = 10,
+                            Source = GetChangeTypeIcon(fileChange.ChangeType),
                             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
                             Margin = new Avalonia.Thickness(5, 0, 0, 0)
                         },
@@ -1080,6 +1087,25 @@ public partial class MainWindow : Window
         headerStackPanel.Children.Add(backButton);
 
         return headerStackPanel;
+    }
+
+    private IImage GetChangeTypeIcon(string changeType)
+    {
+        switch (changeType)
+        {
+            case "Added":
+                return FileHelper.GetBitMap("Icons/add.png");
+            case "Modified":
+                return FileHelper.GetBitMap("Icons/edit-button.png");
+            case "Deleted":
+                return FileHelper.GetBitMap("Icons/delete.png");
+            case "Renamed":
+                return FileHelper.GetBitMap("Icons/rename.png");
+            case "Copied":
+                return FileHelper.GetBitMap("Icons/copy.png");
+            default:
+                return FileHelper.GetBitMap("Icons/question.png");
+        }
     }
 
     private string GetChangeTypeSymbol(string changeType)

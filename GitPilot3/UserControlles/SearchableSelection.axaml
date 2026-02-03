@@ -6,7 +6,7 @@
              mc:Ignorable="d"
              x:Class="GitPilot3.UserControlles.SearchableSelection">
   <StackPanel>
-    <StackPanel Orientation="Horizontal" x:Name="SelectableContainer" Width="200" Height="25" Background="Black" >
+    <StackPanel Orientation="Horizontal" x:Name="SelectableContainer" Width="200" Height="25" Background="{StaticResource SecondaryBrush}" >
     </StackPanel>
   </StackPanel>
 

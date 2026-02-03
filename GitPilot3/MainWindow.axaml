@@ -7,20 +7,8 @@
         Title="GitPilot3"
         MinWidth="1000" MinHeight="600"
         WindowStartupLocation="CenterScreen">
-
     
     <Window.Styles>
-        <Style Selector="Border.commitMessageBorder">
-        </Style>
-        <Style Selector="Border.commitMessageBorder:pointerover">
-            <Setter Property="Background" Value="rgb(43,45,46)" />
-        </Style>
-
-        <Style Selector="StackPanel.fileChangeBorder">
-        </Style>
-        <Style Selector="StackPanel.fileChangeBorder:pointerover">
-            <Setter Property="Background" Value="rgb(43,45,46)" />
-        </Style>
         <Style Selector="TextBox.CommitMessageTextBox">
             <Setter Property="BorderThickness" Value="0" />
         </Style>
@@ -56,15 +44,50 @@
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="10,0" VerticalAlignment="Center" HorizontalAlignment="Center">
                         <Rectangle Width="1" Height="20" Fill="{StaticResource BorderLightBrush}" Margin="5,0"/>
-                        <Button Classes="Secondary Toolbar" Content="Refresh" Click="OnRefresh"/>
-                        <Button Classes="Secondary Toolbar" Content="Fetch" Click="OnFetch"/>
-                        <Button Classes="Secondary Toolbar" Content="Pull" Click="OnPull"/>
-                        <Button Classes="Secondary Toolbar" Content="Push" Click="OnPush"/>
+                        <Button Classes="Secondary Toolbar" Click="OnRefresh">
+                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock Text="Refresh" FontSize="12" Margin="0,0,0,0"/>
+                                <Image Width="16" Height="16" Source="/Assets/Icons/reload.png" Margin="0,0,0,0"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="Secondary Toolbar" Click="OnFetch">
+                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock Text="Fetch" FontSize="12" Margin="0,0,0,0"/>
+                                <Image Width="16" Height="16" Source="/Assets/Icons/cloud-download.png" Margin="0,0,0,0"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="Secondary Toolbar" Click="OnPull">
+                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock Text="Pull" FontSize="12" Margin="0,0,0,0"/>
+                                <Image Width="16" Height="16" Source="/Assets/Icons/downloads.png" Margin="0,0,0,0"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="Secondary Toolbar" Click="OnPush">
+                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock Text="Push" FontSize="12" Margin="0,0,0,0"/>
+                                <Image Width="16" Height="16" Source="/Assets/Icons/uploads.png" Margin="0,0,0,0"/>
+                            </StackPanel>
+                        </Button>
+                        <Rectangle Width="1" Height="50" Fill="{StaticResource BorderLightBrush}" Margin="5,0"/>
+                        <Button Classes="Secondary Toolbar" Click="OnClickCreateBranchOnToolBar">
+                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock Text="Branch" FontSize="12" Margin="0,0,0,0"/>
+                                <Image Width="16" Height="16" Source="/Assets/Icons/branch.png" Margin="0,0,0,0"/>
+                            </StackPanel>
+                        </Button>
                         <Rectangle Width="1" Height="20" Fill="{StaticResource BorderLightBrush}" Margin="5,0"/>
-                        <Button Classes="Secondary Toolbar" Content="Branch" Click="OnClickCreateBranchOnToolBar"/>
-                        <Rectangle Width="1" Height="20" Fill="{StaticResource BorderLightBrush}" Margin="5,0"/>
-                        <Button Classes="Secondary Toolbar" Content="Stash" Click="OnStash"/>
-                        <Button Classes="Secondary Toolbar" Content="Pop" Click="OnPop"/>
+                        <Button Classes="Secondary Toolbar" Click="OnStash">
+                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock Text="Stash" FontSize="12" Margin="0,0,0,0"/>
+                                <Image Width="16" Height="16" Source="/Assets/Icons/download (2).png" Margin="0,0,0,0"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="Secondary Toolbar" Click="OnPop">
+                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock Text="Pop" FontSize="12" Margin="0,0,0,0"/>
+                                <Image Width="16" Height="16" Source="/Assets/Icons/upload-file.png" Margin="0,0,0,0"/>
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
                     <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="10,0" VerticalAlignment="Center" HorizontalAlignment="Right">
                         <Button x:Name="ProfileButton" Classes="Secondary Toolbar" Content="Profile" Click="OnOpenProfile"/>
@@ -73,7 +96,7 @@
             </Border>
 
             <!-- Main Content Area -->
-            <Grid Grid.Row="2" Background="#1E1E1E">
+            <Grid Grid.Row="2" Background="{StaticResource BackgroundBrush}">
                 <Grid.ColumnDefinitions>
                     <!-- Left Sidebar -->
                     <ColumnDefinition Width="300" MinWidth="200"/>
@@ -106,7 +129,7 @@
 
                         <!-- Branches Tree -->
                         <ScrollViewer Grid.Row="1" Margin="5">
-                            <TreeView Background="Transparent" Foreground="White">
+                            <TreeView Foreground="White">
                                 <TreeViewItem x:Name="LocalBranchesTreeViewItem" Header="Local" IsExpanded="True" FontWeight="Bold">
 
                                 </TreeViewItem>
@@ -119,7 +142,7 @@
                 </Border>
 
                 <!-- Left Splitter -->
-                <GridSplitter Grid.Column="1" Width="3" Background="#404040" HorizontalAlignment="Center"/>
+                <GridSplitter Grid.Column="1" Width="3" Background="{StaticResource PrimaryBrush}" HorizontalAlignment="Center"/>
 
                 <!-- Main Graph Visualization Area -->
                 <Border Classes="Content" Grid.Column="2">
@@ -148,15 +171,15 @@
 
                                 <StackPanel Grid.Column="0" x:Name="BranchNamesHeaderStackPanel">
                                 </StackPanel>
-                                <GridSplitter Grid.Column="1" Width="1" HorizontalAlignment="Center"/>
+                                <GridSplitter Background="{StaticResource PrimaryBrush}" Grid.Column="1" Width="1" HorizontalAlignment="Center"/>
 
                                 <StackPanel Grid.Column="2" x:Name="GitGraphColumn">
                                 </StackPanel>
-                                <GridSplitter Grid.Column="3" Width="1" HorizontalAlignment="Center"/>
+                                <GridSplitter Background="{StaticResource PrimaryBrush}" Grid.Column="3" Width="1" HorizontalAlignment="Center"/>
 
                                 <StackPanel Grid.Column="4" x:Name="CommitMessageHeaderStackPanel">
                                 </StackPanel>
-                                <GridSplitter Grid.Column="5" Width="1" HorizontalAlignment="Center"/>
+                                <GridSplitter Background="{StaticResource PrimaryBrush}" Grid.Column="5" Width="1" HorizontalAlignment="Center"/>
 
                                 <StackPanel Grid.Column="6" x:Name="CommitDateHeaderStackPanel">
                                 </StackPanel>
@@ -166,7 +189,7 @@
                 </Border>
 
                 <!-- Right Splitter -->
-                <GridSplitter Grid.Column="3" Width="3" Background="#404040" HorizontalAlignment="Center"/>
+                <GridSplitter Grid.Column="3" Width="3" Background="{StaticResource PrimaryBrush}" HorizontalAlignment="Center"/>
 
                 <!-- Right Details Panel -->
                 <Border Classes="Sidebar" Grid.Column="4" BorderThickness="1,0,0,0">
@@ -202,13 +225,13 @@
                         <Border x:Name="FileChangesHeader" Classes="Section" Grid.Row="2">
                         </Border>
 
-                        <GridSplitter Grid.Row="3" Height="1" HorizontalAlignment="Stretch"/>
+                        <GridSplitter Background="{StaticResource PrimaryBrush}" Grid.Row="3" Height="1" HorizontalAlignment="Stretch"/>
                         <!-- File Changes List -->
                         <ScrollViewer Grid.Row="4" Margin="5">
                             <StackPanel x:Name="FileChangesStackPanel">
                             </StackPanel>
                         </ScrollViewer>
-                        <GridSplitter x:Name="FileChangesSplitter" Grid.Row="5" Height="1" HorizontalAlignment="Stretch" IsVisible="true"/>
+                        <GridSplitter Background="{StaticResource PrimaryBrush}" x:Name="FileChangesSplitter" Grid.Row="5" Height="1" HorizontalAlignment="Stretch" IsVisible="true"/>
 
                         <ScrollViewer x:Name="StagedFileChangesScrollViewer" Grid.Row="6" Margin="5" IsVisible="false">
                             <StackPanel x:Name="StagedFileChangesStackPanel">

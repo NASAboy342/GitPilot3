@@ -1047,10 +1047,11 @@ public partial class MainWindow : Window
 
     private Control GetFileContentHeader(GitCommitFileChange fileChange, ScrollViewer fileContentScrollViewer, ScrollViewer? commitGraphScrollViewer)
     {
+        var secondaryBrush = GetSecondaryColorFromResource();
         var headerStackPanel = new DockPanel
         {
             Height = 30,
-            Background = new SolidColorBrush(Color.FromRgb(42, 42, 42)),
+            Background = secondaryBrush,
         };
 
         var fileNameTextBlock = new TextBlock
@@ -1252,9 +1253,10 @@ public partial class MainWindow : Window
 
     private Border? GetGraphHeaderItem(string headerName)
     {
+        var secondaryColorFromResource = GetSecondaryColorFromResource();
         return new Border
         {
-            Background = new SolidColorBrush(Color.FromRgb(42, 42, 42)),
+            Background = secondaryColorFromResource,
             Height = 25,
             Child = new TextBlock
             {
@@ -1263,6 +1265,11 @@ public partial class MainWindow : Window
                 Margin = new Avalonia.Thickness(5, 0, 0, 0)
             }
         };
+    }
+
+    private static SolidColorBrush GetSecondaryColorFromResource()
+    {
+        return (SolidColorBrush)Application.Current?.Resources["SecondaryBrush"] ?? new SolidColorBrush(Color.FromRgb(0, 0, 0));
     }
 
     private void UpdateCurrentBranchNameDisplay()
@@ -1341,8 +1348,10 @@ public partial class MainWindow : Window
         newItem.Header = GetLocalBranchStatusIndicator(branch);
         newItem.ContextFlyout = GetLocalBranchFlyoutMenu(branch);
 
+        var secondaryColorFromResource = GetSecondaryColorFromResource();
+
         if (branch.IsCurrent)
-            newItem.Background = new SolidColorBrush(Color.FromRgb(81, 81, 81));
+            newItem.Background = secondaryColorFromResource;    
 
         ActionOnItemIsDoubleClick(branch, newItem);
 

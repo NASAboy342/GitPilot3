@@ -50,6 +50,7 @@ class Program
         services.AddTransient<LocalbrancheFlyout>();
         services.AddTransient<CommonSimpleInput>();
         services.AddTransient<CommonConfirmation>();
+        services.AddTransient<CommonOptionsForFlyout>();
         // Add more services as needed when you create them
     }
 }

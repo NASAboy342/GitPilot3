@@ -367,6 +367,13 @@
         <Style Selector="StackPanel.fileChangeBorder:pointerover">
             <Setter Property="Background" Value="{StaticResource HighSecondaryBrush}" />
         </Style>
+
+        <Style Selector="Canvas.graphCanvas">
+
+        </Style>
+        <Style Selector="Canvas.graphCanvas:pointerover">
+            <Setter Property="Background" Value="{StaticResource HighSecondaryBrush}" />
+        </Style>
         
     </Application.Styles>
 </Application>

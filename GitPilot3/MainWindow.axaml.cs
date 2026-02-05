@@ -20,6 +20,7 @@ using GitPilot3.Models.Graph;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using GitPilot3.Helpers;
+using Avalonia.Controls.Primitives;
 
 namespace GitPilot3;
 
@@ -472,6 +473,7 @@ public partial class MainWindow : Window
             var newCanvas = new Canvas
             {
                 Height = _commitMessageRowHeight,
+                Classes = { "graphCanvas" }
             };
             var isAlreadyDrawnCommitPoint = false;
             var drawnCommitPointIndex = 0;
@@ -529,9 +531,90 @@ public partial class MainWindow : Window
                     branchDrawBuffers.Remove(buffer);
                 }
             }
-
-
+            newCanvas.ContextFlyout = GetGraphFlyout(commit);
             commitsGraphStackPanel.Children.Add(newCanvas);
+        }
+    }
+
+    private Flyout GetGraphFlyout(GitCommit commit)
+    {
+        var commonOptionsForFlyout = _serviceProvider.GetService(typeof(CommonOptionsForFlyout)) as CommonOptionsForFlyout;
+        commonOptionsForFlyout.SetOptions(new List<string>
+        {
+            "Cherry-pick Commit",
+            "Copy Commit SHA",
+        });
+        var newFlyout = new Flyout()
+        {
+            Placement = PlacementMode.Right,
+            Content = commonOptionsForFlyout,
+        };
+        commonOptionsForFlyout.OptionSelected += async (s, e) =>
+        {
+            if (e.Equals("Cherry-pick Commit"))
+            {
+                AskConfrimUserToCherryPickCommit(commit);
+                newFlyout.Hide();
+            }
+            else if (e.Equals("Copy Commit SHA"))
+            {
+                await CopyCommitSHA(commit);
+                newFlyout.Hide();
+            }
+        };
+        return newFlyout;
+    }
+
+    private void AskConfrimUserToCherryPickCommit(GitCommit commit)
+    {
+        var newWindow = new Window
+        {
+            Title = "Confirm Cherry-Pick",
+            Width = 500,
+            Height = 100,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var commonConfirmation = new CommonConfirmation();
+        commonConfirmation.Message = $"Are you sure you want to cherry-pick commit {commit.Sha.Substring(0, 7)}. Message: {commit.Message}?";
+        commonConfirmation.OnCancelClicked += (s, e) =>
+        {
+            newWindow.Close();
+        };
+        commonConfirmation.OnYesClicked += async (s, e) =>
+        {
+            await CherryPickCommit(commit);
+            newWindow.Close();
+        };
+        newWindow.Content = commonConfirmation;
+        newWindow.ShowDialog(this);
+    }
+
+    private async Task CopyCommitSHA(GitCommit commit)
+    {
+        try
+        {
+            var sha = commit.Sha;
+            await TopLevel.GetTopLevel(this)!.Clipboard!.SetTextAsync(sha);
+            AddSuccessCard("Commit SHA copied to clipboard.");
+        }
+        catch (Exception ex)
+        {
+            AddErrorCard("Failed to copy commit SHA: " + ex.Message);
+        }
+    }
+
+    private async Task CherryPickCommit(GitCommit commit)
+    {
+        try
+        {
+            var currentUserProfile = await _userProfileService.GetCurrentUserProfileAsync();
+            await _gitRepositoryService.CheckPickCommitAsync(CurrentRepository, commit.Sha, currentUserProfile);
+            AddSuccessCard($"Commit {commit.Sha.Substring(0, 7)} cherry-picked successfully.");
+            await SyncRepository();
+        }
+        catch (Exception ex)
+        {
+            AddErrorCard("Failed to cherry-pick commit: " + ex.Message);
         }
     }
 
@@ -783,15 +866,29 @@ public partial class MainWindow : Window
             // fileChangesSplitter.IsVisible = visible;
             stagedFileChangesScrollViewer.IsVisible = visible;
             commitInputScrollViewer.IsVisible = visible;
+            CheckIfNeedToShowAbortMergeButton();
         }
+    }
+
+    private void CheckIfNeedToShowAbortMergeButton()
+    {
+        var isHaveConfilts = CurrentRepository.CommitDetail.FilesChanged.Any(f => f.IsConflicted);
+        AbortMergeButton.IsVisible = isHaveConfilts;
     }
 
     private async Task UnstageFileChange(GitCommitFileChange fileChange)
     {
         if (CurrentRepository.CommitDetail.Commit.IsWorkInProgress)
         {
-            await _gitRepositoryService.UnStageFilesAsync(CurrentRepository.Path, new List<string> { fileChange.FilePath });
-            await ShowCommitDetails(CurrentRepository.CommitDetail.Commit);
+            try
+            {
+                await _gitRepositoryService.UnStageFilesAsync(CurrentRepository.Path, new List<string> { fileChange.FilePath });
+                await ShowCommitDetails(CurrentRepository.CommitDetail.Commit);
+            }
+            catch (Exception ex)
+            {
+                _errorMessageHandler.ShowErrorMessage("Failed to unstage file: " + ex.Message);
+            }
         }
     }
 
@@ -1251,7 +1348,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private Border? GetGraphHeaderItem(string headerName)
+    private Border GetGraphHeaderItem(string headerName)
     {
         var secondaryColorFromResource = GetSecondaryColorFromResource();
         return new Border
@@ -1351,7 +1448,7 @@ public partial class MainWindow : Window
         var secondaryColorFromResource = GetSecondaryColorFromResource();
 
         if (branch.IsCurrent)
-            newItem.Background = secondaryColorFromResource;    
+            newItem.Background = secondaryColorFromResource;
 
         ActionOnItemIsDoubleClick(branch, newItem);
 
@@ -1392,7 +1489,26 @@ public partial class MainWindow : Window
         ActionOnCreateNewLocalbranchClicked(branch, newLocalbrancheFlyoutComponent, flyout);
         ActionOnMergeBranchClicked(branch, newLocalbrancheFlyoutComponent, flyout);
         ActionOnDeleteBranchClicked(branch, newLocalbrancheFlyoutComponent, flyout);
+        ActionOnCopyBranchNameClicked(branch, newLocalbrancheFlyoutComponent, flyout);
         return flyout;
+    }
+
+    private void ActionOnCopyBranchNameClicked(GitBranch branch, LocalbrancheFlyout newLocalbrancheFlyoutComponent, Flyout flyout)
+    {
+        newLocalbrancheFlyoutComponent!.OnCopyBranchNameClicked += async (s, e) =>
+        {
+            try
+            {
+                flyout.Hide();
+                await TopLevel.GetTopLevel(this)!.Clipboard!.SetTextAsync(branch.Name);
+                AddSuccessCard($"Copied branch name to clipboard. '{branch.Name}'");
+            }
+            catch (Exception ex)
+            {
+                AddErrorCard(ex.Message);
+                return;
+            }
+        };
     }
 
     private void ActionOnDeleteBranchClicked(GitBranch branch, LocalbrancheFlyout newLocalbrancheFlyoutComponent, Flyout flyout)
@@ -1723,6 +1839,45 @@ public partial class MainWindow : Window
     }
     private async void OnCommitButtonClick(object sender, RoutedEventArgs e)
     {
+        var isHaveConflicts = CurrentRepository.CommitDetail != null && CurrentRepository.CommitDetail.FilesChanged.Any(f => f.IsConflicted);
+        if (isHaveConflicts)
+        {
+            ConfirmToCommitWithConflicts();
+        }
+        else
+        {
+            await ProcessCommitAsync();
+        }
+        
+    }
+
+    private void ConfirmToCommitWithConflicts()
+    {
+        var newWindow = new Window
+        {
+            Title = "Confirm Commit Changes",
+            Width = 500,
+            Height = 100,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var commonConfirmation = new CommonConfirmation()
+        {
+            Message = "Are you sure you want to commit to resolve conflicts?",
+        };
+        commonConfirmation.OnCancelClicked += (o, e) =>
+        {
+            newWindow.Close();
+        };
+        commonConfirmation.OnYesClicked += async (o, e) =>{
+            await ProcessCommitAsync();
+            newWindow.Close();
+        };
+        newWindow.Content = commonConfirmation;
+        newWindow.Show(this);
+    }
+
+    private async Task ProcessCommitAsync()
+    {
         try
         {
             if (CurrentRepository.CommitDetail != null && CurrentRepository.CommitDetail.Commit.IsWorkInProgress)
@@ -1754,6 +1909,7 @@ public partial class MainWindow : Window
             AddErrorCard(ex.Message);
         }
     }
+
     private void OnOpenProfile(object sender, RoutedEventArgs e)
     {
         var profileWindow = _serviceProvider.GetService(typeof(ProfileManagementWindow)) as ProfileManagementWindow;
@@ -1839,7 +1995,7 @@ public partial class MainWindow : Window
             try
             {
                 var userProfile = await _userProfileService.GetCurrentUserProfileAsync();
-                await _gitRepositoryService.StashChanges(CurrentRepository.Path, userProfile);
+                await _gitRepositoryService.StashChangesAsync(CurrentRepository.Path, userProfile);
                 await SyncRepository();
                 AddSuccessCard("All uncommitted changes have been stashed successfully.");
             }
@@ -1872,7 +2028,7 @@ public partial class MainWindow : Window
             newWindow.Close();
             try
             {
-                await _gitRepositoryService.PopLastStashChanges(CurrentRepository.Path);
+                await _gitRepositoryService.PopLastStashChangesAsync(CurrentRepository.Path);
                 await SyncRepository();
                 AddSuccessCard("The latest stashed changes have been popped successfully.");
             }
@@ -1880,6 +2036,36 @@ public partial class MainWindow : Window
             {
                 AddErrorCard(ex.Message);
                 return;
+            }
+        };
+        newWindow.Content = commonConfirmation;
+        newWindow.Show(this);
+    }
+
+    private void OnAbortMergeButtonClick(object sender, RoutedEventArgs e){
+        var newWindow = new Window
+        {
+            Title = "Pop Stashed Changes",
+            Width = 500,
+            Height = 100,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var commonConfirmation = new CommonConfirmation();
+        commonConfirmation.Message = "Are you sure you want to abort the current merge?";
+        commonConfirmation.OnCancelClicked += (o, e) =>{
+            newWindow.Close();
+        };
+        commonConfirmation.OnYesClicked += async (o, e) => {
+            newWindow.Close();
+            try
+            {
+                await _gitRepositoryService.AbortMergeAsync(CurrentRepository.Path);
+                await SyncRepository();
+                AddSuccessCard("The current merge has been aborted successfully.");
+            }
+            catch (Exception ex)
+            {
+                AddErrorCard(ex.Message);
             }
         };
         newWindow.Content = commonConfirmation;

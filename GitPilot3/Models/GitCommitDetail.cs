@@ -23,4 +23,5 @@ public class GitCommitFileChange
     public string FileContent { get; set; } = "";
     public string DiffContent { get; set; } = "";
     public bool IsStaged { get; set; } = true;
+    public bool IsConflicted { get; set; }
 }

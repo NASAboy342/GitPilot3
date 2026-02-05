@@ -196,7 +196,8 @@ public class GitRepositoryService : IGitRepositoryService
                 entry.State.HasFlag(FileStatus.ModifiedInIndex) ||
                 entry.State.HasFlag(FileStatus.DeletedFromIndex) ||
                 entry.State.HasFlag(FileStatus.RenamedInIndex) ||
-                entry.State.HasFlag(FileStatus.TypeChangeInIndex))
+                entry.State.HasFlag(FileStatus.TypeChangeInIndex) ||
+                entry.State.HasFlag(FileStatus.Conflicted))
             {
                 var change = changes.FirstOrDefault(c => c.Path == entry.FilePath);
                 var patch = libgitRepository.Diff.Compare<Patch>(null, DiffTargets.Index, new[] { entry.FilePath });
@@ -209,9 +210,10 @@ public class GitRepositoryService : IGitRepositoryService
                 fileChange.Deletions = patchEntry?.LinesDeleted ?? 0;
                 fileChange.DiffContent = patchEntry?.Patch ?? "";
                 fileChange.IsStaged = true;
+                fileChange.IsConflicted = entry.State.HasFlag(FileStatus.Conflicted);
 
                 var blob = libgitRepository.Index[entry.FilePath]?.Id;
-                fileChange.FileContent = blob != null ? libgitRepository.Lookup<LibGit2Sharp.Blob>(blob)?.GetContentText() : "";
+                fileChange.FileContent = blob != null ? libgitRepository.Lookup<Blob>(blob)?.GetContentText() : "";
 
                 commitDetail.FilesChanged.Add(fileChange);
             }
@@ -258,11 +260,32 @@ public class GitRepositoryService : IGitRepositoryService
         return Task.CompletedTask;
     }
 
-    public Task UnStageFilesAsync(string path, List<string> list)
+    public async Task UnStageFilesAsync(string path, List<string> list)
     {
         var libgitRepository = new Repository(path);
-        Commands.Unstage(libgitRepository, list);
-        return Task.CompletedTask;
+
+        var conflictedPaths = new HashSet<string>(
+            libgitRepository
+                .RetrieveStatus()
+                .Where(s => s.State.HasFlag(FileStatus.Conflicted))
+                .Select(s => s.FilePath)
+        );
+
+        var targetsWithoutConflicts = list.Where(p => !conflictedPaths.Contains(p)).ToList();
+        var conflictedTargets = list.Where(conflictedPaths.Contains).ToList();
+
+        if (targetsWithoutConflicts.Any())
+        {
+            Commands.Unstage(libgitRepository, targetsWithoutConflicts);
+        }
+
+        if (conflictedTargets.Any())
+        {
+            throw new InvalidOperationException(
+                "Cannot unstage conflicted files. Resolve conflicts first: " +
+                string.Join(", ", conflictedTargets)
+            );
+        }
     }
 
     public async Task ValidateIfCommitIsPossibleAsync(string path, GitRepository currentRepository)
@@ -458,7 +481,7 @@ public class GitRepositoryService : IGitRepositoryService
         libgitRepository.CheckoutPaths(libgitRepository.Head.FriendlyName, unstageFilePaths, new CheckoutOptions{ CheckoutModifiers = CheckoutModifiers.Force });
     }
 
-    public async Task StashChanges(string path, UserProfile userProfile)
+    public async Task StashChangesAsync(string path, UserProfile userProfile)
     {
         var libgitRepository = new Repository(path);
         var signature = new Signature(userProfile.Username, userProfile.Email, DateTimeOffset.Now);
@@ -466,7 +489,7 @@ public class GitRepositoryService : IGitRepositoryService
         libgitRepository.Stashes.Add(signature, message, StashModifiers.IncludeUntracked);
     }
 
-    public async Task PopLastStashChanges(string path)
+    public async Task PopLastStashChangesAsync(string path)
     {
         var libgitRepository = new Repository(path);
         if (libgitRepository.Stashes.Count() == 0)
@@ -474,5 +497,22 @@ public class GitRepositoryService : IGitRepositoryService
             throw new InvalidOperationException("No stashes to pop.");
         }
         libgitRepository.Stashes.Pop(0);
+    }
+
+    public async Task CheckPickCommitAsync(GitRepository currentRepository, string commitSha, UserProfile userProfile)
+    {
+        var libgitRepository = new Repository(currentRepository.Path);
+        var libgitCommit = libgitRepository.Lookup<LibGit2Sharp.Commit>(commitSha);
+        if (libgitCommit == null)
+            throw new Exception($"Commit '{commitSha}' not found.");
+
+        var signature = new Signature(userProfile.Username, userProfile.Email, DateTimeOffset.Now);
+        libgitRepository.CherryPick(libgitCommit, signature);
+    }
+
+    public async Task AbortMergeAsync(string path)
+    {
+        var repo = new Repository(path);
+        repo.Reset(ResetMode.Hard, repo.Head.Tip);
     }
 }

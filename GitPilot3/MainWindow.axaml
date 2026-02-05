@@ -243,9 +243,14 @@
                                 <TextBox x:Name="CommitMessageTextBox" Classes="CommitMessageTextBox" AcceptsReturn="True" Watermark="Enter commit message..." TextWrapping="NoWrap"/>
                                 <TextBox x:Name="CommitDescriptionTextBox" Classes="CommitDescriptionTextBox" AcceptsReturn="True" Watermark="description..." TextWrapping="Wrap" Height="70"/>
                             </StackPanel>
-                            <Button x:Name="CommitButton" Classes="Primary Large" Grid.Row="" Margin="10" HorizontalAlignment="Stretch" Click="OnCommitButtonClick">
-                                <TextBlock Text="Commit Changes" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Button>
+                            <Grid x:Name="CommitButtonsGrid" ColumnDefinitions="Auto,*">
+                                <Button Grid.Column="0" x:Name="AbortMergeButton" Classes="Warning Large" Margin="10" HorizontalAlignment="Stretch" Click="OnAbortMergeButtonClick">
+                                    <TextBlock Text="Abort merge" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Button>
+                                <Button Grid.Column="1" x:Name="CommitButton" Classes="Primary Large" Margin="10" HorizontalAlignment="Stretch" Click="OnCommitButtonClick">
+                                    <TextBlock Text="Commit Changes" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Button>
+                            </Grid>
                         </StackPanel>
                     </Grid>
                 </Border>

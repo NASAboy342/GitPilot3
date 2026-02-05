@@ -29,6 +29,8 @@ public interface IGitRepositoryService
     Task<string> CloneRepositoryAsync(string url, string localPath, UserProfile currentUserProfile);
     void ValidateGitRepositoryUrl(string url);
     Task DiscardFilesAsync(string path, List<string> unstageFilePaths);
-    Task StashChanges(string path, UserProfile userProfile);
-    Task PopLastStashChanges(string path);
+    Task StashChangesAsync(string path, UserProfile userProfile);
+    Task PopLastStashChangesAsync(string path);
+    Task CheckPickCommitAsync(GitRepository currentRepository, string commitSha, UserProfile userProfile);
+    Task AbortMergeAsync(string path);
 }

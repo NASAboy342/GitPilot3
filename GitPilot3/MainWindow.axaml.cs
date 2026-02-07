@@ -479,40 +479,22 @@ public partial class MainWindow : Window
             var isAlreadyDrawnCommitPoint = false;
             var drawnCommitPointIndex = 0;
             var pendingRemoveFromBranchBuffers = new List<BranchDrawBuffer>();
+            
             foreach (var branchDrawBuffer in branchDrawBuffers)
             {
-                if (IsFoundParentCommit(commit, branchDrawBuffer))
+                if (IsFountParentCommit(commit, branchDrawBuffer))
                 {
-                    if (isAlreadyDrawnCommitPoint)
-                    {
-                        newCanvas.Children.Add(_graphComponentService.GetCheckOutCurveLineCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer), branchDrawBuffer.Color));
-                        DrawCheckoutLineFromParent(branchDrawBuffers, newCanvas, drawnCommitPointIndex, branchDrawBuffer);
-                        pendingRemoveFromBranchBuffers.Add(branchDrawBuffer);
-                    }
-                    else
-                    {
-                        var relativeColor = GetBranchColorOfCommit(commit, CurrentRepository);
-                        newCanvas.Children.Add(_graphComponentService.GetUpperConnectorLineCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer), relativeColor ?? branchDrawBuffer.Color));
-                        newCanvas.Children.Add(_graphComponentService.GetCommitPointCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer), isAMergeCommit, relativeColor ?? branchDrawBuffer.Color));
-                        newCanvas.Children.Add(_graphComponentService.GetLowerConnectorLineCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer), relativeColor ?? branchDrawBuffer.Color));
-                        branchDrawBuffer.Sha = commit.Sha;
-                        branchDrawBuffer.ParentShas = commit.ParentShas;
-                        branchDrawBuffer.Color = relativeColor ?? branchDrawBuffer.Color;
-                        isAlreadyDrawnCommitPoint = true;
-                        drawnCommitPointIndex = branchDrawBuffers.IndexOf(branchDrawBuffer);
-                    }
+                    DrawBranchFromParent(branchDrawBuffers, commit, isAMergeCommit, newCanvas, ref isAlreadyDrawnCommitPoint, ref drawnCommitPointIndex, pendingRemoveFromBranchBuffers, branchDrawBuffer);
                 }
+                else if (IsPrevios)
                 else
                 {
-                    newCanvas.Children.Add(_graphComponentService.GetBranchLineCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer), branchDrawBuffer.Color));
+                    DrawVerticalBranchLine(branchDrawBuffers, newCanvas, branchDrawBuffer);
                 }
             }
             if (!isAlreadyDrawnCommitPoint)
             {
-                var relativeColor = GetBranchColorOfCommit(commit, CurrentRepository) ?? new RGBColor(0, 0, 0);
-                newCanvas.Children.Add(_graphComponentService.GetCommitPointCanvas(branchDrawBuffers.Count, isAMergeCommit, relativeColor));
-                newCanvas.Children.Add(_graphComponentService.GetLowerConnectorLineCanvas(branchDrawBuffers.Count, relativeColor));
-                branchDrawBuffers.Add(new BranchDrawBuffer { Sha = commit.Sha, ParentShas = commit.ParentShas, Color = relativeColor });
+                DrawCommitPoint(branchDrawBuffers, commit, isAMergeCommit, newCanvas);
             }
 
             if (IsFountParentSource(mergePointBuffers, commit, out List<MergePointBuffer> foundMergePoints))
@@ -527,13 +509,53 @@ public partial class MainWindow : Window
             }
             if (pendingRemoveFromBranchBuffers.Any())
             {
-                foreach (var buffer in pendingRemoveFromBranchBuffers)
-                {
-                    branchDrawBuffers.Remove(buffer);
-                }
+                RemoveBranchThatArePendingRemove(branchDrawBuffers, pendingRemoveFromBranchBuffers);
             }
             newCanvas.ContextFlyout = GetGraphFlyout(commit);
             commitsGraphStackPanel.Children.Add(newCanvas);
+        }
+    }
+
+    private static void RemoveBranchThatArePendingRemove(List<BranchDrawBuffer> branchDrawBuffers, List<BranchDrawBuffer> pendingRemoveFromBranchBuffers)
+    {
+        foreach (var buffer in pendingRemoveFromBranchBuffers)
+        {
+            branchDrawBuffers.Remove(buffer);
+        }
+    }
+
+    private void DrawCommitPoint(List<BranchDrawBuffer> branchDrawBuffers, GitCommit commit, bool isAMergeCommit, Canvas newCanvas)
+    {
+        var relativeColor = GetBranchColorOfCommit(commit, CurrentRepository) ?? new RGBColor(0, 0, 0);
+        newCanvas.Children.Add(_graphComponentService.GetCommitPointCanvas(branchDrawBuffers.Count, isAMergeCommit, relativeColor));
+        newCanvas.Children.Add(_graphComponentService.GetLowerConnectorLineCanvas(branchDrawBuffers.Count, relativeColor));
+        branchDrawBuffers.Add(new BranchDrawBuffer { Sha = commit.Sha, ParentShas = commit.ParentShas, Color = relativeColor });
+    }
+
+    private void DrawVerticalBranchLine(List<BranchDrawBuffer> branchDrawBuffers, Canvas newCanvas, BranchDrawBuffer branchDrawBuffer)
+    {
+        newCanvas.Children.Add(_graphComponentService.GetBranchLineCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer), branchDrawBuffer.Color));
+    }
+
+    private void DrawBranchFromParent(List<BranchDrawBuffer> branchDrawBuffers, GitCommit commit, bool isAMergeCommit, Canvas newCanvas, ref bool isAlreadyDrawnCommitPoint, ref int drawnCommitPointIndex, List<BranchDrawBuffer> pendingRemoveFromBranchBuffers, BranchDrawBuffer branchDrawBuffer)
+    {
+        if (isAlreadyDrawnCommitPoint)
+        {
+            newCanvas.Children.Add(_graphComponentService.GetCheckOutCurveLineCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer), branchDrawBuffer.Color));
+            DrawCheckoutLineFromParent(branchDrawBuffers, newCanvas, drawnCommitPointIndex, branchDrawBuffer);
+            pendingRemoveFromBranchBuffers.Add(branchDrawBuffer);
+        }
+        else
+        {
+            var relativeColor = GetBranchColorOfCommit(commit, CurrentRepository);
+            newCanvas.Children.Add(_graphComponentService.GetUpperConnectorLineCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer), relativeColor ?? branchDrawBuffer.Color));
+            newCanvas.Children.Add(_graphComponentService.GetCommitPointCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer), isAMergeCommit, relativeColor ?? branchDrawBuffer.Color));
+            newCanvas.Children.Add(_graphComponentService.GetLowerConnectorLineCanvas(branchDrawBuffers.IndexOf(branchDrawBuffer), relativeColor ?? branchDrawBuffer.Color));
+            branchDrawBuffer.Sha = commit.Sha;
+            branchDrawBuffer.ParentShas = commit.ParentShas;
+            branchDrawBuffer.Color = relativeColor ?? branchDrawBuffer.Color;
+            isAlreadyDrawnCommitPoint = true;
+            drawnCommitPointIndex = branchDrawBuffers.IndexOf(branchDrawBuffer);
         }
     }
 
@@ -708,7 +730,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private static bool IsFoundParentCommit(GitCommit commit, BranchDrawBuffer branchDrawBuffer)
+    private static bool IsFountParentCommit(GitCommit commit, BranchDrawBuffer branchDrawBuffer)
     {
         if (branchDrawBuffer.ParentShas.Count == 0)
             return false;

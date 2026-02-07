@@ -23,8 +23,8 @@
         <Style Selector="Button.Primary">
             <Setter Property="Background" Value="#2196F3" />
             <Setter Property="Foreground" Value="White" />
-            <Setter Property="BorderBrush" Value="#1976D2" />
             <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="#1976D2" />
             <Setter Property="CornerRadius" Value="4" />
             <Setter Property="Padding" Value="12,6" />
             <Setter Property="Margin" Value="2" />
@@ -374,6 +374,17 @@
         <Style Selector="Canvas.graphCanvas:pointerover">
             <Setter Property="Background" Value="{StaticResource HighSecondaryBrush}" />
         </Style>
+
+        <Style Selector="ScrollBar">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Width" Value="10"/>
+        </Style>
+
+        <Style Selector="ScrollBar#PART_Thumb">
+            <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+            <Setter Property="CornerRadius" Value="6"/>
+        </Style>
+
         
     </Application.Styles>
 </Application>

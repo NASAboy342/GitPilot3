@@ -151,8 +151,15 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-                        <ScrollViewer x:Name="FileContentScrollViewer" Grid.Row="1" IsVisible="false">
-                        </ScrollViewer>
+                        <Grid x:Name="FileContentGrid" Grid.Row="1" IsVisible="false" RowDefinitions="20,*">
+                            <DockPanel x:Name="FileHeaderDockPanel" Grid.Row="0"> </DockPanel>
+                            <Grid x:Name="FileContentInnerGrid" Grid.Row="1" ColumnDefinitions="*,20">
+                                <ScrollViewer x:Name="FileContentScrollViewer" Grid.Column="0">
+                                </ScrollViewer>
+                                <Canvas Grid.Column="1" x:Name="ChangeAreaBarCanvas" Background="Transparent" >
+                                </Canvas>
+                            </Grid>
+                        </Grid>
                         <ScrollViewer x:Name="CommitGraphScrollViewer" Grid.Row="1" IsVisible="true">
                             <Grid>
                                 <Grid.ColumnDefinitions>

@@ -1076,22 +1076,12 @@ public partial class MainWindow : Window
     {
         try
         {
-            var fileContentScrollViewer = this.FindControl<ScrollViewer>("FileContentScrollViewer");
             var commitGraphScrollViewer = this.FindControl<ScrollViewer>("CommitGraphScrollViewer");
 
-            if (fileContentScrollViewer == null)
-                return;
-
-            var stackPanel = new StackPanel
-            {
-                Orientation = Avalonia.Layout.Orientation.Vertical,
-            };
-
-            stackPanel.Children.Add(GetFileContentHeader(fileChange, fileContentScrollViewer, commitGraphScrollViewer));
-
-            stackPanel.Children.Add(GetFileContentView(fileChange));
-            fileContentScrollViewer.Content = stackPanel;
-            fileContentScrollViewer.IsVisible = true;
+            FileHeaderDockPanel.Children.Clear();
+            FileHeaderDockPanel.Children.Add(GetFileContentHeader(fileChange, commitGraphScrollViewer));
+            FileContentScrollViewer.Content = GetFileContentView(fileChange);
+            FileContentGrid.IsVisible = true;
 
             if (commitGraphScrollViewer != null)
             {
@@ -1106,7 +1096,7 @@ public partial class MainWindow : Window
 
     }
 
-    private Control GetFileContentView(GitCommitFileChange fileChange)
+    private StackPanel GetFileContentView(GitCommitFileChange fileChange)
     {
         var stackPanel = new StackPanel
         {
@@ -1157,18 +1147,48 @@ public partial class MainWindow : Window
         var gitDiffLines = fileChange.DiffContent.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).ToList();
         try
         {
-            var repositoryPath = CurrentRepository.Path.Replace("/.git/", "");
+            var repositoryPath = CurrentRepository.Path.Replace("/.git/", "").Replace("\\.git\\", "");
             var filePath = gitDiffLines.FirstOrDefault()?.Split(' ').FirstOrDefault(l => l.StartsWith("b/"))?.Substring(2) ?? "";
             var path = System.IO.Path.Combine(repositoryPath, filePath);
             var changeContents = GetChangeContentFromGitDiff(gitDiffLines);
             var fileContentLines = FileHelper.ReadFromFile(path);
             var resultFiltContentLines = CombindFileContentWithChangeContent(fileContentLines, changeContents);
+            DrawChangesIndicatorsNearScrollBar(resultFiltContentLines, changeContents);
             return resultFiltContentLines;
         }
         catch (Exception ex)
         {
             AddErrorCard("Failed to read the current file contents: " + ex.Message);
             return gitDiffLines;
+        }
+    }
+
+    private void DrawChangesIndicatorsNearScrollBar(List<string> resultFiltContentLines, List<ChangeContent> changeContents)
+    {
+        ChangeAreaBarCanvas.Children.Clear();
+        ChangeAreaBarCanvas.Margin = new Thickness(0,20);
+        var totalines = resultFiltContentLines.Count;
+        var canvasHeight = ChangeAreaBarCanvas.Bounds.Height;
+        var canvasWidth = ChangeAreaBarCanvas.Bounds.Width;
+        foreach (var changeContent in changeContents)
+        {
+            foreach (var line in changeContent.ChangeLines)
+            {
+                var index = changeContent.ChangeLines.IndexOf(line);
+                var row = changeContent.StartLine + index + 1;
+                if (line.StartsWith("+") || line.StartsWith("-"))
+                {
+                    var indicator = new Border
+                    {
+                        Width = canvasWidth,
+                        Height = 2,
+                        Background = line.StartsWith("+") ? Brushes.LightGreen : Brushes.IndianRed,
+                        Opacity = 0.5,
+                    };
+                    Canvas.SetTop(indicator, (row - 1) * canvasHeight / totalines);
+                    ChangeAreaBarCanvas.Children.Add(indicator);
+                }
+            }
         }
     }
 
@@ -1230,24 +1250,32 @@ public partial class MainWindow : Window
         return contains;
     }
 
-    private Control GetFileContentHeader(GitCommitFileChange fileChange, ScrollViewer fileContentScrollViewer, ScrollViewer? commitGraphScrollViewer)
+    private DockPanel GetFileContentHeader(GitCommitFileChange fileChange, ScrollViewer? commitGraphScrollViewer)
     {
         var secondaryBrush = GetSecondaryColorFromResource();
         var headerStackPanel = new DockPanel
         {
-            Height = 30,
             Background = secondaryBrush,
         };
 
-        var fileNameTextBlock = new TextBlock
+        var fileNameTextBlock = new TextBlock()
         {
-            Text = fileChange.FileName,
-            FontSize = 16,
-            FontWeight = Avalonia.Media.FontWeight.Bold,
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
             Margin = new Avalonia.Thickness(5, 0, 0, 0)
         };
+        fileNameTextBlock.Inlines.Add(new Run
+        {
+            FontSize = 16,
+            Text = fileChange.FileName,
+            FontWeight = Avalonia.Media.FontWeight.Bold,
+        });
+        fileNameTextBlock.Inlines.Add(new Run
+        {
+           FontSize = 10,
+           Text = $" :{fileChange.FilePath}"
+        });
+        
         DockPanel.SetDock(fileNameTextBlock, Dock.Left);
 
         var backButton = new Button
@@ -1262,7 +1290,7 @@ public partial class MainWindow : Window
 
         backButton.Click += (sender, e) =>
         {
-            fileContentScrollViewer.IsVisible = false;
+            FileContentGrid.IsVisible = false;
             if (commitGraphScrollViewer != null)
             {
                 commitGraphScrollViewer.IsVisible = true;

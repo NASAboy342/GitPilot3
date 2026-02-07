@@ -21,6 +21,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using GitPilot3.Helpers;
 using Avalonia.Controls.Primitives;
+using System.Text.RegularExpressions;
 
 namespace GitPilot3;
 
@@ -828,7 +829,7 @@ public partial class MainWindow : Window
             DockPanel.SetDock(fileInfo, Dock.Left);
             fileInfo.Tapped += async (sender, e) =>
             {
-                await ShowFileChangeDetail(fileChange);
+                await ShowFileChangeContent(fileChange);
             };
 
             var unstageFileButton = new Button
@@ -957,7 +958,7 @@ public partial class MainWindow : Window
             DockPanel.SetDock(fileInfo, Dock.Left);
             fileInfo.Tapped += async (sender, e) =>
             {
-                await ShowFileChangeDetail(fileChange);
+                await ShowFileChangeContent(fileChange);
             };
             fileChangeItem.Children.Add(fileInfo);
 
@@ -1071,29 +1072,38 @@ public partial class MainWindow : Window
 
     }
 
-    private async Task ShowFileChangeDetail(GitCommitFileChange fileChange)
+    private async Task ShowFileChangeContent(GitCommitFileChange fileChange)
     {
-        var fileContentScrollViewer = this.FindControl<ScrollViewer>("FileContentScrollViewer");
-        var commitGraphScrollViewer = this.FindControl<ScrollViewer>("CommitGraphScrollViewer");
-
-        if (fileContentScrollViewer == null)
-            return;
-
-        var stackPanel = new StackPanel
+        try
         {
-            Orientation = Avalonia.Layout.Orientation.Vertical,
-        };
+            var fileContentScrollViewer = this.FindControl<ScrollViewer>("FileContentScrollViewer");
+            var commitGraphScrollViewer = this.FindControl<ScrollViewer>("CommitGraphScrollViewer");
 
-        stackPanel.Children.Add(GetFileContentHeader(fileChange, fileContentScrollViewer, commitGraphScrollViewer));
+            if (fileContentScrollViewer == null)
+                return;
 
-        stackPanel.Children.Add(GetFileContentView(fileChange));
-        fileContentScrollViewer.Content = stackPanel;
-        fileContentScrollViewer.IsVisible = true;
+            var stackPanel = new StackPanel
+            {
+                Orientation = Avalonia.Layout.Orientation.Vertical,
+            };
 
-        if (commitGraphScrollViewer != null)
-        {
-            commitGraphScrollViewer.IsVisible = false;
+            stackPanel.Children.Add(GetFileContentHeader(fileChange, fileContentScrollViewer, commitGraphScrollViewer));
+
+            stackPanel.Children.Add(GetFileContentView(fileChange));
+            fileContentScrollViewer.Content = stackPanel;
+            fileContentScrollViewer.IsVisible = true;
+
+            if (commitGraphScrollViewer != null)
+            {
+                commitGraphScrollViewer.IsVisible = false;
+            }
         }
+        catch (Exception ex)
+        {
+            AddErrorCard("Failed to show file content: " + ex.Message);
+            return;
+        }
+
     }
 
     private Control GetFileContentView(GitCommitFileChange fileChange)
@@ -1103,8 +1113,7 @@ public partial class MainWindow : Window
             Orientation = Avalonia.Layout.Orientation.Vertical,
             Margin = new Avalonia.Thickness(5)
         };
-
-        var lines = fileChange.DiffContent.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        var lines = ConvertGitDiffFormatToFileContents(fileChange);
 
         var selectableTextBlock = new SelectableTextBlock
         {
@@ -1133,6 +1142,7 @@ public partial class MainWindow : Window
                 Text = line + Environment.NewLine,
                 Foreground = lineColor,
                 Background = backgroundColor,
+                FontFamily = new FontFamily("Lucida Console"),
             });
 
         }
@@ -1140,6 +1150,84 @@ public partial class MainWindow : Window
         stackPanel.Children.Add(selectableTextBlock);
 
         return stackPanel;
+    }
+
+    private List<string> ConvertGitDiffFormatToFileContents(GitCommitFileChange fileChange)
+    {
+        var gitDiffLines = fileChange.DiffContent.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+        try
+        {
+            var repositoryPath = CurrentRepository.Path.Replace("/.git/", "");
+            var filePath = gitDiffLines.FirstOrDefault()?.Split(' ').FirstOrDefault(l => l.StartsWith("b/"))?.Substring(2) ?? "";
+            var path = System.IO.Path.Combine(repositoryPath, filePath);
+            var changeContents = GetChangeContentFromGitDiff(gitDiffLines);
+            var fileContentLines = FileHelper.ReadFromFile(path);
+            var resultFiltContentLines = CombindFileContentWithChangeContent(fileContentLines, changeContents);
+            return resultFiltContentLines;
+        }
+        catch (Exception ex)
+        {
+            AddErrorCard("Failed to read the current file contents: " + ex.Message);
+            return gitDiffLines;
+        }
+    }
+
+    private List<string> CombindFileContentWithChangeContent(List<string> fileContentLines, List<ChangeContent> changeContents)
+    {
+        var resultFileContentLines = new List<string>(fileContentLines);
+        foreach (var changeContent in changeContents)
+        {
+            resultFileContentLines.RemoveRange(changeContent.StartLine - 1, changeContent.LineCount);
+            resultFileContentLines.InsertRange(changeContent.StartLine - 1, changeContent.ChangeLines);
+
+        }
+        return resultFileContentLines;
+    }
+
+    private List<ChangeContent> GetChangeContentFromGitDiff(List<string> gitDiffLines)
+    {
+        var changeContents = new List<ChangeContent>();
+        foreach (var line in gitDiffLines)
+        {
+            if (line.Equals("\\ No newline at end of file"))
+            {
+                break;
+            }
+            bool isHeadChange = IsHeadChange(line, out string startRow);
+            if (isHeadChange)
+            {
+                var changeContent = new ChangeContent();
+                changeContent.ChangeHead = line;
+                var changeRange = line.Split(' ').FirstOrDefault(p => p.StartsWith("+"))?.TrimStart('+').Split(',') ?? new string[2] { "0", "0" };
+                changeContent.StartLine = int.Parse(changeRange[0]);
+                changeContent.LineCount = int.Parse(changeRange[1]);
+                changeContents.Add(changeContent);
+                continue;
+            }
+            if (changeContents.Count > 0)
+            {
+                var lastChangeContent = changeContents.Last();
+                if (lastChangeContent.ChangeLines == null)
+                {
+                    lastChangeContent.ChangeLines = new List<string>();
+                }
+                lastChangeContent.ChangeLines.Add(line);
+            }
+        }
+        return changeContents;
+    }
+
+    private static bool IsHeadChange(string line, out string startRow)
+    {
+        var regexPattern = @"@@ -\d+,\d+ \+\d+,\d+ @@";
+        var contains = Regex.IsMatch(line, regexPattern);
+        startRow = string.Empty;
+        if (contains)
+        {
+            var match = Regex.Match(line, regexPattern);
+            startRow = line.Substring(match.Length - 1);
+        }
+        return contains;
     }
 
     private Control GetFileContentHeader(GitCommitFileChange fileChange, ScrollViewer fileContentScrollViewer, ScrollViewer? commitGraphScrollViewer)
@@ -1848,7 +1936,7 @@ public partial class MainWindow : Window
         {
             await ProcessCommitAsync();
         }
-        
+
     }
 
     private void ConfirmToCommitWithConflicts()
@@ -1868,7 +1956,8 @@ public partial class MainWindow : Window
         {
             newWindow.Close();
         };
-        commonConfirmation.OnYesClicked += async (o, e) =>{
+        commonConfirmation.OnYesClicked += async (o, e) =>
+        {
             await ProcessCommitAsync();
             newWindow.Close();
         };
@@ -2042,7 +2131,8 @@ public partial class MainWindow : Window
         newWindow.Show(this);
     }
 
-    private void OnAbortMergeButtonClick(object sender, RoutedEventArgs e){
+    private void OnAbortMergeButtonClick(object sender, RoutedEventArgs e)
+    {
         var newWindow = new Window
         {
             Title = "Pop Stashed Changes",
@@ -2052,10 +2142,12 @@ public partial class MainWindow : Window
         };
         var commonConfirmation = new CommonConfirmation();
         commonConfirmation.Message = "Are you sure you want to abort the current merge?";
-        commonConfirmation.OnCancelClicked += (o, e) =>{
+        commonConfirmation.OnCancelClicked += (o, e) =>
+        {
             newWindow.Close();
         };
-        commonConfirmation.OnYesClicked += async (o, e) => {
+        commonConfirmation.OnYesClicked += async (o, e) =>
+        {
             newWindow.Close();
             try
             {

@@ -486,7 +486,7 @@ public partial class MainWindow : Window
                 {
                     DrawBranchFromParent(branchDrawBuffers, commit, isAMergeCommit, newCanvas, ref isAlreadyDrawnCommitPoint, ref drawnCommitPointIndex, pendingRemoveFromBranchBuffers, branchDrawBuffer);
                 }
-                else if (IsPrevios)
+                // else if (IsPrevios)
                 else
                 {
                     DrawVerticalBranchLine(branchDrawBuffers, newCanvas, branchDrawBuffer);
@@ -1154,7 +1154,7 @@ public partial class MainWindow : Window
                 Text = line + Environment.NewLine,
                 Foreground = lineColor,
                 Background = backgroundColor,
-                FontFamily = new FontFamily("Lucida Console"),
+                FontFamily = new FontFamily("Lucida Console, Monaco"),
             });
 
         }

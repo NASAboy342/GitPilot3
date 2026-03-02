@@ -41,7 +41,7 @@ jobs:
         Write-Host "Ready to copy release to deployment directory..."
         Write-Host "copying file to MacOs release directory..."
         Write-Host "Copying files from dist to ${{ env.macOsReleaseDir }}"
-        Copy-Item -Path "${{env.publishedDir}}/*" -Destination "${{ env.macOsReleaseDir }}/dmg-temp/GitPilot3.app/Contents/MacOS" -Recurse -Force
+        Copy-Item -Path "${{env.publishedDir}}/*" -Destination "${{ env.macOsReleaseDir }}/dmg-temp/GitPilot3.app/Contents/MacOS/" -Recurse -Force
         Write-Host "Files copied successfully! Existing files have been replaced."
         Write-Host "commiting changes to repository..."
         cd "${{ env.repositoryDir }}"

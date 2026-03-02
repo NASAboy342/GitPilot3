@@ -8,5 +8,6 @@ public interface IAppStageService
 {
     List<OpenedRepository> GetAllOpenedRepositories();
     GitRepository GetCurrentRepository();
+    void RemoveRepositoryFromOpenedList(OpenedRepository openedRepo);
     void SaveCurrentRepository(GitRepository currentRepository);
 }

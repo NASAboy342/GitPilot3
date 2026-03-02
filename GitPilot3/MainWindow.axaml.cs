@@ -118,11 +118,15 @@ public partial class MainWindow : Window
             Task.Run(async () => {remoteBranches = await _gitRepositoryService.GetRemoteBranchesAsync(CurrentRepository.Path);}),
             Task.Run(async () => {CurrentRepository.Commits = await _gitRepositoryService.GetCommitsAsync(CurrentRepository.Path);}),
         };
-
         await Task.WhenAll(tasks);
 
-        UpdateLocalBranches(localBranches);
-        UpdateRemoteBranches(remoteBranches);
+        tasks = new List<Task>()
+        {
+            Task.Run(() => UpdateLocalBranches(localBranches)),
+            Task.Run(() => UpdateRemoteBranches(remoteBranches))
+        };
+        await Task.WhenAll(tasks);
+
         UpdateCurrentRepositoryDisplay();
 
         if (CurrentRepository.CommitDetail != null && !string.IsNullOrEmpty(CurrentRepository.CommitDetail.Commit.Sha))
@@ -131,7 +135,7 @@ public partial class MainWindow : Window
             UpdateFileChangesView();
         }
 
-        _appStageService.SaveCurrentRepository(CurrentRepository);
+        Task.Run(() => _appStageService.SaveCurrentRepository(CurrentRepository));
     }
 
     private void UpdateRemoteBranches(List<GitBranch> remoteBranches)
@@ -283,13 +287,7 @@ public partial class MainWindow : Window
                 var selectedOpenedRepo = openedRepositories.FirstOrDefault(r => r.Name.Equals(selectedRepoName, StringComparison.OrdinalIgnoreCase));
                 if (selectedOpenedRepo == null)
                     return;
-                CurrentRepository = await _gitRepositoryService.LoadRepositoryAsync(selectedOpenedRepo.Path);
-                CurrentRepository.RemoteBranches = await _gitRepositoryService.GetRemoteBranchesAsync(selectedOpenedRepo.Path);
-                CurrentRepository.LocalBranches = await _gitRepositoryService.GetLocalBranchesAsync(selectedOpenedRepo.Path);
-                CurrentRepository.Commits = await _gitRepositoryService.GetCommitsAsync(selectedOpenedRepo.Path);
-                UpdateCurrentRepositoryDisplay();
-                _appStageService.SaveCurrentRepository(CurrentRepository);
-                InitializeGitWatcher();
+                await LoadOpenedRepository(selectedOpenedRepo);
                 AddSuccessCard($"Switched to repository: {CurrentRepository.Name}.");
             }
             catch (Exception ex)
@@ -298,6 +296,13 @@ public partial class MainWindow : Window
                 return;
             }
         };
+    }
+
+    private async Task LoadOpenedRepository(OpenedRepository selectedOpenedRepo)
+    {
+        CurrentRepository = await _gitRepositoryService.LoadRepositoryAsync(selectedOpenedRepo.Path);
+        await SyncRepository();
+        InitializeGitWatcher();
     }
 
     private async Task LoadProfileInfoDisplay()
@@ -376,10 +381,106 @@ public partial class MainWindow : Window
     {
         RepoNameTextBlock.Text = CurrentRepository.Name;
         RepoPathTextBlock.Text = CurrentRepository.Path;
+        UpdateOpenRepositoryBar();
         UpdateLocalBranchesTreeView();
         UpdateRemoteBranchesTreeView();
         UpdateCurrentBranchNameDisplay();
         UpdateCommitsInfoView();
+    }
+
+    private void UpdateOpenRepositoryBar()
+    {
+        OpenRepositoryStackPanel.Children.Clear();
+        foreach( var openedRepo in _appStageService.GetAllOpenedRepositories().OrderByDescending(r => r.LastOpened))
+        {
+            var isCurrentRepository = CurrentRepository != null && openedRepo.Name.Equals(CurrentRepository.Name, StringComparison.OrdinalIgnoreCase);
+            var newButton = new Button
+            {
+                Content = openedRepo.Name,
+                Classes = { "Secondary" },
+                FontSize = 10,
+                Foreground = isCurrentRepository ? new SolidColorBrush(Colors.White) : new SolidColorBrush(Colors.Gray),
+                Margin = new Avalonia.Thickness(0, 0, 5, 0),
+                Padding = new Avalonia.Thickness(3, 3, 3, 0),
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                Height = 20,
+            };
+            newButton.DoubleTapped += async (s, e) =>
+            {
+                try
+                {
+                    await LoadOpenedRepository(openedRepo);
+                    UpdateRepositoryComboBox();
+                    AddSuccessCard($"Switched to repository: {CurrentRepository.Name}.");
+                }
+                catch (Exception ex)
+                {
+                    _errorMessageHandler.ShowErrorMessage("Failed to switch repository: " + ex.Message);
+                    return;
+                }
+            };
+            newButton.ContextFlyout = GetOpenRepositoryFlyout(openedRepo);
+            OpenRepositoryStackPanel.Children.Add(newButton);
+        }
+    }
+
+    private FlyoutBase? GetOpenRepositoryFlyout(OpenedRepository openedRepo)
+    {
+        var newFlyout = new Flyout()
+        {
+            Placement = PlacementMode.Bottom,
+        };
+        var commonOptionsForFlyout = _serviceProvider.GetService(typeof(CommonOptionsForFlyout)) as CommonOptionsForFlyout;
+        commonOptionsForFlyout.SetOptions(new List<string>
+        {
+            "Remove from Opened List",
+        });
+
+        commonOptionsForFlyout.OptionSelected += async (s, e) =>
+        {
+            if (e.Equals("Remove from Opened List"))
+            {
+                RemoveRepositoryFromOpenedList(openedRepo);
+            }
+        };
+
+        newFlyout.Content = commonOptionsForFlyout;
+        return newFlyout;
+    }
+
+    private void RemoveRepositoryFromOpenedList(OpenedRepository openedRepo)
+    {
+        var newWindow = new Window
+        {
+            Title = "Confirm Remove",
+            Width = 500,
+            Height = 100,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var commonConfirmation = new CommonConfirmation();
+        commonConfirmation.Message = $"Are you sure you want to remove repository \"{openedRepo.Name}\" from opened list?";
+        commonConfirmation.OnCancelClicked += (s, e) =>
+        {
+            newWindow.Close();
+        };
+        commonConfirmation.OnConfirmClicked += async (s, e) =>
+        {
+            try
+            {
+                _appStageService.RemoveRepositoryFromOpenedList(openedRepo);
+                await SyncRepository();
+                AddSuccessCard($"Repository \"{openedRepo.Name}\" removed from opened list.");
+            }
+            catch (Exception ex)
+            {
+                AddErrorCard("Failed to remove repository from opened list: " + ex.Message);
+                return;
+            }
+            newWindow.Close();
+        };
+        newWindow.Content = commonConfirmation;
+        newWindow.ShowDialog(this);
     }
 
     private void UpdateCommitsInfoView()
@@ -419,7 +520,66 @@ public partial class MainWindow : Window
                     }
                 }
             };
+            commitBranchItem.ContextFlyout = GetBranchNameFlyout(commitBranch);
             commitsBranchStackPanel.Children.Add(commitBranchItem);
+        }
+    }
+
+    private FlyoutBase? GetBranchNameFlyout(GitBranch commitBranch)
+    {
+        var newFlyout = new Flyout()
+        {
+            Placement = PlacementMode.Right,
+        };
+        var commonOptionsForFlyout = _serviceProvider.GetService(typeof(CommonOptionsForFlyout)) as CommonOptionsForFlyout;
+        commonOptionsForFlyout.SetOptions(new List<string>
+        {
+            "Checkout Branch",
+            "Copy Branch Name",
+        });
+
+        commonOptionsForFlyout.OptionSelected += async (s, e) =>
+        {
+            if (e.Equals("Checkout Branch"))
+            {
+                await CheckoutToBranch(commitBranch);
+                newFlyout.Hide();
+            }
+            else if (e.Equals("Copy Branch Name"))
+            {
+                await TopLevel.GetTopLevel(this)!.Clipboard!.SetTextAsync(commitBranch.Name);
+                newFlyout.Hide();
+            }
+        };
+
+        newFlyout.Content = commonOptionsForFlyout;
+        return newFlyout;
+    }
+
+    private async Task CheckoutToBranch(GitBranch commitBranch)
+    {
+        try
+        {
+            if (!IsLocalBranchName(commitBranch.Name))
+            {
+                var currentUserProfile = await _userProfileService.GetCurrentUserProfileAsync();
+                await _gitRepositoryService.FetchAsync(CurrentRepository.Path, currentUserProfile);
+                await SyncRepository();
+                await _gitRepositoryService.CreateNewLocalBranchFromRemoteAsync(CurrentRepository.Path, commitBranch.Name);
+            }
+            var localBranchName = ConvertRemoteBranchNameToLocalBranchName(commitBranch.Name);
+            await _gitRepositoryService.CheckoutBranchAsync(CurrentRepository, localBranchName);
+            CurrentRepository.LocalBranches = await _gitRepositoryService.GetLocalBranchesAsync(CurrentRepository.Path);
+            UpdateLocalBranchesTreeView();
+            UpdateCurrentBranchNameDisplay();
+            await SyncRepository();
+            
+            AddSuccessCard($"Switched to branch: {localBranchName} successfully.");
+        }
+        catch (Exception ex)
+        {
+            AddErrorCard("Failed to checkout branch: " + ex.Message);
+            return;
         }
     }
 
@@ -479,7 +639,7 @@ public partial class MainWindow : Window
             var isAlreadyDrawnCommitPoint = false;
             var drawnCommitPointIndex = 0;
             var pendingRemoveFromBranchBuffers = new List<BranchDrawBuffer>();
-            
+
             foreach (var branchDrawBuffer in branchDrawBuffers)
             {
                 if (IsFountParentCommit(commit, branchDrawBuffer))
@@ -603,7 +763,7 @@ public partial class MainWindow : Window
         {
             newWindow.Close();
         };
-        commonConfirmation.OnYesClicked += async (s, e) =>
+        commonConfirmation.OnConfirmClicked += async (s, e) =>
         {
             await CherryPickCommit(commit);
             newWindow.Close();
@@ -1028,7 +1188,7 @@ public partial class MainWindow : Window
             {
                 newWindow.Close();
             };
-            commonConfirmation.OnYesClicked += async (s, e) =>
+            commonConfirmation.OnConfirmClicked += async (s, e) =>
             {
                 await DiscardFileAsync(new List<string> { fileChange.FilePath });
                 newWindow.Close();
@@ -1188,7 +1348,7 @@ public partial class MainWindow : Window
     private void DrawChangesIndicatorsNearScrollBar(List<string> resultFiltContentLines, List<ChangeContent> changeContents)
     {
         ChangeAreaBarCanvas.Children.Clear();
-        ChangeAreaBarCanvas.Margin = new Thickness(0,20);
+        ChangeAreaBarCanvas.Margin = new Thickness(0, 20);
         var totalines = resultFiltContentLines.Count;
         var canvasHeight = ChangeAreaBarCanvas.Bounds.Height;
         var canvasWidth = ChangeAreaBarCanvas.Bounds.Width;
@@ -1294,10 +1454,10 @@ public partial class MainWindow : Window
         });
         fileNameTextBlock.Inlines.Add(new Run
         {
-           FontSize = 10,
-           Text = $" :{fileChange.FilePath}"
+            FontSize = 10,
+            Text = $" :{fileChange.FilePath}"
         });
-        
+
         DockPanel.SetDock(fileNameTextBlock, Dock.Left);
 
         var backButton = new Button
@@ -1537,17 +1697,15 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task OnRemoteBranchDoubleClicked(string name)
+    private async Task OnRemoteBranchDoubleClicked(string remoteBranchName)
     {
         try
         {
             var currentUserProfile = await _userProfileService.GetCurrentUserProfileAsync();
             await _gitRepositoryService.FetchAsync(CurrentRepository.Path, currentUserProfile);
             await SyncRepository();
-            await _gitRepositoryService.CreateNewLocalBranchFromRemoteAsync(CurrentRepository.Path, name);
-            var splitedName = name.Split('/').ToList();
-            splitedName.RemoveAt(0);
-            var localBranchName = string.Join('/', splitedName);
+            await _gitRepositoryService.CreateNewLocalBranchFromRemoteAsync(CurrentRepository.Path, remoteBranchName);
+            var localBranchName = ConvertRemoteBranchNameToLocalBranchName(remoteBranchName);
             await _gitRepositoryService.CheckoutBranchAsync(CurrentRepository, localBranchName);
             CurrentRepository.LocalBranches = await _gitRepositoryService.GetLocalBranchesAsync(CurrentRepository.Path);
             UpdateLocalBranchesTreeView();
@@ -1559,6 +1717,22 @@ public partial class MainWindow : Window
             AddErrorCard(ex.Message);
             return;
         }
+    }
+
+    private static string ConvertRemoteBranchNameToLocalBranchName(string name)
+    {
+        if(IsLocalBranchName(name))
+            return name;
+        var splitedName = name.Split('/').ToList();
+        splitedName.RemoveAt(0);
+        var localBranchName = string.Join('/', splitedName);
+        return localBranchName;
+    }
+
+    private static bool IsLocalBranchName(string name)
+    {
+        var localBranchPrefixes = new List<string> { "origin/", "upstream/" };
+        return !localBranchPrefixes.Any(prefix => name.StartsWith(prefix));
     }
 
     private void UpdateLocalBranchesTreeView()
@@ -1637,8 +1811,8 @@ public partial class MainWindow : Window
         {
             try
             {
-                flyout.Hide();
                 await TopLevel.GetTopLevel(this)!.Clipboard!.SetTextAsync(branch.Name);
+                flyout.Hide();
                 AddSuccessCard($"Copied branch name to clipboard. '{branch.Name}'");
             }
             catch (Exception ex)
@@ -1683,7 +1857,7 @@ public partial class MainWindow : Window
     {
         var commonConfirmation = _serviceProvider.GetService(typeof(CommonConfirmation)) as CommonConfirmation;
         commonConfirmation.Message = $"Are you sure you want to delete the branch '{branch.Name}'?";
-        commonConfirmation.OnYesClicked += async (ss, ee) =>
+        commonConfirmation.OnConfirmClicked += async (ss, ee) =>
         {
             await ProcessDeleteBranch(branch);
             newWindow.Close();
@@ -1703,6 +1877,7 @@ public partial class MainWindow : Window
             CurrentRepository.LocalBranches = await _gitRepositoryService.GetLocalBranchesAsync(CurrentRepository.Path);
             UpdateLocalBranchesTreeView();
             UpdateCurrentBranchNameDisplay();
+            await SyncRepository();
             AddSuccessCard($"Deleted branch: {branch.Name} successfully.");
         }
         catch (Exception ex)
@@ -1932,7 +2107,7 @@ public partial class MainWindow : Window
     {
         var commonConfirmation = _serviceProvider.GetService(typeof(CommonConfirmation)) as CommonConfirmation;
         commonConfirmation!.Message = $"Do you want to publish branch?";
-        commonConfirmation.OnYesClicked += async (ss, ee) =>
+        commonConfirmation.OnConfirmClicked += async (ss, ee) =>
         {
             try
             {
@@ -2006,7 +2181,7 @@ public partial class MainWindow : Window
         {
             newWindow.Close();
         };
-        commonConfirmation.OnYesClicked += async (o, e) =>
+        commonConfirmation.OnConfirmClicked += async (o, e) =>
         {
             await ProcessCommitAsync();
             newWindow.Close();
@@ -2128,7 +2303,7 @@ public partial class MainWindow : Window
         {
             newWindow.Close();
         };
-        commonConfirmation.OnYesClicked += async (o, e) =>
+        commonConfirmation.OnConfirmClicked += async (o, e) =>
         {
             newWindow.Close();
             try
@@ -2162,7 +2337,7 @@ public partial class MainWindow : Window
         {
             newWindow.Close();
         };
-        commonConfirmation.OnYesClicked += async (o, e) =>
+        commonConfirmation.OnConfirmClicked += async (o, e) =>
         {
             newWindow.Close();
             try
@@ -2196,7 +2371,7 @@ public partial class MainWindow : Window
         {
             newWindow.Close();
         };
-        commonConfirmation.OnYesClicked += async (o, e) =>
+        commonConfirmation.OnConfirmClicked += async (o, e) =>
         {
             newWindow.Close();
             try

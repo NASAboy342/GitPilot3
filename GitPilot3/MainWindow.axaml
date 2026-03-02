@@ -20,6 +20,8 @@
     <Grid x:Name="MainGrid">
         <Grid>
             <Grid.RowDefinitions>
+                <!-- Open Repository Bar -->
+                <RowDefinition Height="25"/>
                 <!-- Menu Bar -->
                 <RowDefinition Height="Auto"/>
                 <!-- Toolbar -->
@@ -29,8 +31,12 @@
                 <!-- Status Bar -->
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
+            <!-- Open Repository Bar -->
+            <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Hidden">
+                <StackPanel x:Name="OpenRepositoryStackPanel" Orientation="Horizontal" Margin="5,0"/>
+            </ScrollViewer>
             <!-- Toolbar -->
-            <Border Classes="Toolbar" Grid.Row="1">
+            <Border Classes="Toolbar" Grid.Row="2">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="300"/>
@@ -96,7 +102,7 @@
             </Border>
 
             <!-- Main Content Area -->
-            <Grid Grid.Row="2" Background="{StaticResource BackgroundBrush}">
+            <Grid Grid.Row="3" Background="{StaticResource BackgroundBrush}">
                 <Grid.ColumnDefinitions>
                     <!-- Left Sidebar -->
                     <ColumnDefinition Width="300" MinWidth="200"/>
@@ -264,7 +270,7 @@
             </Grid>
 
             <!-- Status Bar -->
-            <Border Classes="Footer" Grid.Row="3">
+            <Border Classes="Footer" Grid.Row="4">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>

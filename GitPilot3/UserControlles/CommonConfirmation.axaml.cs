@@ -7,7 +7,7 @@ namespace GitPilot3.UserControlles;
 
 public partial class CommonConfirmation : UserControl
 {
-    public EventHandler? OnYesClicked;
+    public EventHandler? OnConfirmClicked;
     public EventHandler? OnCancelClicked;
     public string Message
     {
@@ -29,6 +29,6 @@ public partial class CommonConfirmation : UserControl
 
     private void OnYesClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        OnYesClicked?.Invoke(this, EventArgs.Empty);
+        OnConfirmClicked?.Invoke(this, EventArgs.Empty);
     }
 }

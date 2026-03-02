@@ -1,1 +1,51 @@
 
+name: Deploy
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  repositoryDir: D:\Clones\GitPilot3
+  projectDir: D:\Clones\GitPilot3\GitPilot3
+  publishedDir: D:\Clones\GitPilot3\GitPilot3\bin\Release\net9.0\osx-arm64\publish
+  macOsReleaseDir: D:\Clones\GitPilot3\Release\MacOs
+
+jobs:
+  test-runner:
+    runs-on: self-hosted  # This will use your self-hosted runner
+    
+    steps:
+    - name: Pull Repository
+      shell: powershell
+      run: |
+        Write-Host "Going to repository directory..."
+        cd "${{ env.repositoryDir }}"
+        Write-Host "Current directory: $(Get-Location)"
+        Write-Host "Pulling latest code..."
+        git pull origin main
+
+    - name: Deploy Application
+      shell: powershell
+      run: |
+        Write-Host "Going to project directory..."
+        cd "${{ env.projectDir }}"
+        Write-Host "Current directory: $(Get-Location)"
+        Write-Host "Installing dependencies..."
+        dotnet restore
+        Write-Host "Building application..."
+        dotnet build
+        Write-Host "Build completed successfully!"
+        Write-Host "Publishing application..."
+        dotnet publish -c Release -r osx-arm64 --self-contained true
+        Write-Host "Ready to copy release to deployment directory..."
+        Write-Host "copying file to MacOs release directory..."
+        Write-Host "Copying files from dist to ${{ env.macOsReleaseDir }}"
+        Copy-Item -Path "${{env.publishedDir}}/*" -Destination "${{ env.macOsReleaseDir }}/GitPilot3.app/Contents/MacOS" -Recurse -Force
+        Write-Host "Files copied successfully! Existing files have been replaced."
+        Write-Host "commiting changes to repository..."
+        cd "${{ env.repositoryDir }}"
+        git add .
+        git commit -m "Deployed new version of GitPilot3"
+        git push origin main
+        Write-Host "Deployment completed successfully!"

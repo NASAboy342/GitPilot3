@@ -8,7 +8,7 @@ on:
 env:
   repositoryDir: D:\Clones\GitPilot3
   projectDir: D:\Clones\GitPilot3\GitPilot3
-  publishedDir: D:\Clones\GitPilot3\GitPilot3\bin\Release\net9.0\osx-arm64\publish
+  publishedDir: D:\Clones\GitPilot3\GitPilot3\bin\Release\net9.0\osx-x64\publish
   macOsReleaseDir: D:\Clones\GitPilot3\Release\MacOs
 
 jobs:
@@ -35,12 +35,16 @@ jobs:
         dotnet restore
         Write-Host "Building application..."
         dotnet build
+        Write-Host "Clearing existing published files..."
         Write-Host "Build completed successfully!"
         Write-Host "Publishing application..."
-        dotnet publish -c Release -r osx-arm64 --self-contained true
+        # dotnet publish -c Release -r osx-arm64 --self-contained true
+        dotnet publish -c Release -r osx-x64 --self-contained true
         Write-Host "Ready to copy release to deployment directory..."
         Write-Host "copying file to MacOs release directory..."
         Write-Host "Copying files from dist to ${{ env.macOsReleaseDir }}"
+        Write-Host "clearing existing files in ${{ env.macOsReleaseDir }}..."
+        Remove-Item -Path "${{ env.macOsReleaseDir }}/dmg-temp/GitPilot3.app/Contents/MacOS/*" -Recurse -Force
         Copy-Item -Path "${{env.publishedDir}}/*" -Destination "${{ env.macOsReleaseDir }}/dmg-temp/GitPilot3.app/Contents/MacOS/" -Recurse -Force
         Write-Host "Files copied successfully! Existing files have been replaced."
         Write-Host "commiting changes to repository..."

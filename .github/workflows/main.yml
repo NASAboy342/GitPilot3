@@ -52,4 +52,4 @@ jobs:
         git add .
         git commit -m "Deployed new version of GitPilot3"
         git push origin main
-        Write-Host "Deployment completed successfully!"
+        Write-Host "Deployment completed successfully! "

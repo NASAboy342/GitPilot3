@@ -51,5 +51,5 @@ jobs:
         cd "${{ env.repositoryDir }}"
         git add .
         git commit -m "Deployed new version of GitPilot3"
-        git push origin main
+        git push origin Deployed
         Write-Host "Deployment completed successfully!"

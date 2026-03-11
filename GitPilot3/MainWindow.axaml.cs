@@ -38,6 +38,7 @@ public partial class MainWindow : Window
     private FileSystemWatcher? _fileSystemWatcher;
     private IGraphComponentService _graphComponentService;
     private EventHandler OnRepositoryOpenedSuccessfully;
+    private ILoadingService _loadingService;
 
     public MainWindow(IUserProfileService userProfileService,
     IGitRepositoryService gitRepositoryService,
@@ -45,21 +46,44 @@ public partial class MainWindow : Window
     IAppStageService appStageService,
     ErrorMessageHandler errorMessageHandler,
     LocalbrancheFlyout localbrancheFlyout,
-    IGraphComponentService graphComponentService)
+    IGraphComponentService graphComponentService,
+    ILoadingService loadingService)
     {
         _userProfileService = userProfileService;
         _gitRepositoryService = gitRepositoryService;
         _serviceProvider = serviceProvider;
         _appStageService = appStageService;
+        _loadingService = loadingService;
         _errorMessageHandler = errorMessageHandler;
         _folderPicker = new FolderPicker(this);
         _graphComponentService = graphComponentService;
         _graphComponentService.Height = _commitMessageRowHeight;
+        SetActionOnLoadingChange();
         InitializeComponent();
         SetupWindow();
         _errorMessageHandler.ErrorMessageShown += (s, e) => AddErrorCard(e);
         _errorMessageHandler.SuccessMessageShown += (s, e) => AddSuccessCard(e);
         InitializeGitWatcher();
+    }
+
+    private void SetActionOnLoadingChange()
+    {
+        _loadingService.LoadingStateChanged += (s, e) =>
+        {
+            var currentMessage = _loadingService.GetCurrentLoadingMessage();
+            if (string.IsNullOrEmpty(currentMessage))
+            {
+                LoadingIndicatorPanel.IsVisible = false;
+                ApplicationStatusText.IsVisible = true;
+                ApplicationStatusText.Text = "Ready";
+            }
+            else
+            {
+                LoadingIndicatorPanel.IsVisible = true;
+                ApplicationStatusText.IsVisible = true;
+                ApplicationStatusText.Text = currentMessage;
+            }
+        };
     }
 
     private async Task InitializeGitWatcher()
@@ -106,36 +130,50 @@ public partial class MainWindow : Window
 
     private async Task SyncRepository()
     {
-        if (CurrentRepository == null || string.IsNullOrEmpty(CurrentRepository.Path))
-            throw new InvalidOperationException("No repository is currently loaded.");
-
-        var localBranches = new List<GitBranch>();
-        var remoteBranches = new List<GitBranch>();
-
-        var tasks = new List<Task>()
+        var newLoadingId = _loadingService.GenerateUniqueId();
+        _loadingService.StartLoading(newLoadingId, "Syncing repository...");
+        try
         {
-            Task.Run(async () => {localBranches = await _gitRepositoryService.GetLocalBranchesAsync(CurrentRepository.Path);}),
-            Task.Run(async () => {remoteBranches = await _gitRepositoryService.GetRemoteBranchesAsync(CurrentRepository.Path);}),
-            Task.Run(async () => {CurrentRepository.Commits = await _gitRepositoryService.GetCommitsAsync(CurrentRepository.Path);}),
-        };
-        await Task.WhenAll(tasks);
 
-        tasks = new List<Task>()
-        {
-            Task.Run(() => UpdateLocalBranches(localBranches)),
-            Task.Run(() => UpdateRemoteBranches(remoteBranches))
-        };
-        await Task.WhenAll(tasks);
 
-        UpdateCurrentRepositoryDisplay();
+            if (CurrentRepository == null || string.IsNullOrEmpty(CurrentRepository.Path))
+                throw new InvalidOperationException("No repository is currently loaded.");
 
-        if (CurrentRepository.CommitDetail != null && !string.IsNullOrEmpty(CurrentRepository.CommitDetail.Commit.Sha))
-        {
-            CurrentRepository.CommitDetail = await _gitRepositoryService.GetCommitDetailsAsync(CurrentRepository.Path, CurrentRepository.CommitDetail.Commit);
-            UpdateFileChangesView();
+            var localBranches = new List<GitBranch>();
+            var remoteBranches = new List<GitBranch>();
+
+            var tasks = new List<Task>()
+            {
+                Task.Run(async () => {localBranches = await _gitRepositoryService.GetLocalBranchesAsync(CurrentRepository.Path);}),
+                Task.Run(async () => {remoteBranches = await _gitRepositoryService.GetRemoteBranchesAsync(CurrentRepository.Path);}),
+                Task.Run(async () => {CurrentRepository.Commits = await _gitRepositoryService.GetCommitsAsync(CurrentRepository.Path);}),
+            };
+                await Task.WhenAll(tasks);
+
+                tasks = new List<Task>()
+            {
+                Task.Run(() => UpdateLocalBranches(localBranches)),
+                Task.Run(() => UpdateRemoteBranches(remoteBranches))
+            };
+            await Task.WhenAll(tasks);
+
+            UpdateCurrentRepositoryDisplay();
+
+            if (CurrentRepository.CommitDetail != null && !string.IsNullOrEmpty(CurrentRepository.CommitDetail.Commit.Sha))
+            {
+                CurrentRepository.CommitDetail = await _gitRepositoryService.GetCommitDetailsAsync(CurrentRepository.Path, CurrentRepository.CommitDetail.Commit);
+                UpdateFileChangesView();
+            }
+
+            Task.Run(() => _appStageService.SaveCurrentRepository(CurrentRepository));
+            _loadingService.StopLoading(newLoadingId);
         }
-
-        Task.Run(() => _appStageService.SaveCurrentRepository(CurrentRepository));
+        catch (Exception ex)
+        {
+            _loadingService.StopLoading(newLoadingId);
+            _errorMessageHandler.ShowErrorMessage("Failed to sync repository: " + ex.Message);
+            return;
+        }
     }
 
     private void UpdateRemoteBranches(List<GitBranch> remoteBranches)
@@ -225,12 +263,15 @@ public partial class MainWindow : Window
     {
         try
         {
+            var newLoadingId = _loadingService.GenerateUniqueId();
+            _loadingService.StartLoading(newLoadingId, "Loading last opened repository...");
             var lastRepository = _appStageService.GetCurrentRepository();
             if (lastRepository == null)
                 return;
             CurrentRepository = lastRepository;
             UpdateCurrentRepositoryDisplay();
             UpdateRepositoryComboBox();
+            _loadingService.StopLoading(newLoadingId);
         }
         catch (Exception ex)
         {
@@ -281,6 +322,8 @@ public partial class MainWindow : Window
     {
         searchableSelection.SelectedItemChanged += async (s, e) =>
         {
+            var newloadingId = _loadingService.GenerateUniqueId();
+            _loadingService.StartLoading(newloadingId, "Switching repository...");
             try
             {
                 var selectedRepoName = searchableSelection.SelectedItem;
@@ -294,6 +337,10 @@ public partial class MainWindow : Window
             {
                 _errorMessageHandler.ShowErrorMessage("Failed to switch repository: " + ex.Message);
                 return;
+            }
+            finally
+            {
+                _loadingService.StopLoading(newloadingId);
             }
         };
     }
@@ -309,6 +356,8 @@ public partial class MainWindow : Window
     {
         try
         {
+            var newLoadingId = _loadingService.GenerateUniqueId();
+            _loadingService.StartLoading(newLoadingId, "Loading profile...");
             var profileButton = this.FindControl<Button>("ProfileButton");
             if (profileButton == null)
                 return;
@@ -346,6 +395,7 @@ public partial class MainWindow : Window
             };
             stackPanel.Children.Add(username);
             profileButton.Content = stackPanel;
+            _loadingService.StopLoading(newLoadingId);
         }
         catch (Exception ex)
         {
@@ -391,7 +441,7 @@ public partial class MainWindow : Window
     private void UpdateOpenRepositoryBar()
     {
         OpenRepositoryStackPanel.Children.Clear();
-        foreach( var openedRepo in _appStageService.GetAllOpenedRepositories().OrderByDescending(r => r.LastOpened))
+        foreach (var openedRepo in _appStageService.GetAllOpenedRepositories().OrderByDescending(r => r.LastOpened))
         {
             var isCurrentRepository = CurrentRepository != null && openedRepo.Name.Equals(CurrentRepository.Name, StringComparison.OrdinalIgnoreCase);
             var newButton = new Button
@@ -408,6 +458,8 @@ public partial class MainWindow : Window
             };
             newButton.DoubleTapped += async (s, e) =>
             {
+                var newloadingId = _loadingService.GenerateUniqueId();
+                _loadingService.StartLoading(newloadingId, "Switching repository...");
                 try
                 {
                     await LoadOpenedRepository(openedRepo);
@@ -418,6 +470,10 @@ public partial class MainWindow : Window
                 {
                     _errorMessageHandler.ShowErrorMessage("Failed to switch repository: " + ex.Message);
                     return;
+                }
+                finally
+                {
+                    _loadingService.StopLoading(newloadingId);
                 }
             };
             newButton.ContextFlyout = GetOpenRepositoryFlyout(openedRepo);
@@ -558,8 +614,10 @@ public partial class MainWindow : Window
 
     private async Task CheckoutToBranch(GitBranch commitBranch)
     {
+        var newLoadingId = _loadingService.GenerateUniqueId();
         try
         {
+            _loadingService.StartLoading(newLoadingId, $"Checking out to branch {commitBranch.Name}...");
             if (!IsLocalBranchName(commitBranch.Name))
             {
                 var currentUserProfile = await _userProfileService.GetCurrentUserProfileAsync();
@@ -573,11 +631,12 @@ public partial class MainWindow : Window
             UpdateLocalBranchesTreeView();
             UpdateCurrentBranchNameDisplay();
             await SyncRepository();
-            
+            _loadingService.StopLoading(newLoadingId);
             AddSuccessCard($"Switched to branch: {localBranchName} successfully.");
         }
         catch (Exception ex)
         {
+            _loadingService.StopLoading(newLoadingId);
             AddErrorCard("Failed to checkout branch: " + ex.Message);
             return;
         }
@@ -1721,7 +1780,7 @@ public partial class MainWindow : Window
 
     private static string ConvertRemoteBranchNameToLocalBranchName(string name)
     {
-        if(IsLocalBranchName(name))
+        if (IsLocalBranchName(name))
             return name;
         var splitedName = name.Split('/').ToList();
         splitedName.RemoveAt(0);
@@ -2034,6 +2093,8 @@ public partial class MainWindow : Window
 
     private async void OnFetch(object sender, RoutedEventArgs e)
     {
+        var newloadingId = _loadingService.GenerateUniqueId();
+        _loadingService.StartLoading(newloadingId, "Fetching changes from remote repository...");
         try
         {
             var currentUserProfile = await _userProfileService.GetCurrentUserProfileAsync();
@@ -2046,10 +2107,16 @@ public partial class MainWindow : Window
             AddErrorCard(ex.Message);
             return;
         }
+        finally
+        {
+            _loadingService.StopLoading(newloadingId);
+        }
     }
 
     private async void OnPull(object sender, RoutedEventArgs e)
     {
+        var newloadingId = _loadingService.GenerateUniqueId();
+        _loadingService.StartLoading(newloadingId, "Pulling changes from remote repository...");
         try
         {
             if (string.IsNullOrEmpty(CurrentRepository.Name))
@@ -2066,10 +2133,16 @@ public partial class MainWindow : Window
             AddErrorCard(ex.Message);
             return;
         }
+        finally
+        {
+            _loadingService.StopLoading(newloadingId);
+        }
     }
 
     private async void OnPush(object sender, RoutedEventArgs e)
     {
+        var newloadingId = _loadingService.GenerateUniqueId();
+        _loadingService.StartLoading(newloadingId, "Pushing changes to remote repository...");
         try
         {
             var userProfile = await _userProfileService.GetCurrentUserProfileAsync();
@@ -2086,6 +2159,10 @@ public partial class MainWindow : Window
             }
             AddErrorCard(ex.Message);
             return;
+        }
+        finally
+        {
+            _loadingService.StopLoading(newloadingId);
         }
     }
 
@@ -2192,6 +2269,8 @@ public partial class MainWindow : Window
 
     private async Task ProcessCommitAsync()
     {
+        var newloadingId = _loadingService.GenerateUniqueId();
+        _loadingService.StartLoading(newloadingId, "Committing changes...");
         try
         {
             if (CurrentRepository.CommitDetail != null && CurrentRepository.CommitDetail.Commit.IsWorkInProgress)
@@ -2221,6 +2300,10 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             AddErrorCard(ex.Message);
+        }
+        finally
+        {
+            _loadingService.StopLoading(newloadingId);
         }
     }
 
@@ -2263,6 +2346,8 @@ public partial class MainWindow : Window
 
     private async Task CloneRepository(string url)
     {
+        var newloadingId = _loadingService.GenerateUniqueId();
+        _loadingService.StartLoading(newloadingId, "Cloning repository...");
         try
         {
             _gitRepositoryService.ValidateGitRepositoryUrl(url);
@@ -2286,6 +2371,10 @@ public partial class MainWindow : Window
             AddErrorCard(ex.Message);
             return;
         }
+        finally
+        {
+            _loadingService.StopLoading(newloadingId);
+        }
     }
 
     private void OnStash(object sender, RoutedEventArgs e)
@@ -2306,6 +2395,8 @@ public partial class MainWindow : Window
         commonConfirmation.OnConfirmClicked += async (o, e) =>
         {
             newWindow.Close();
+            var newloadingId = _loadingService.GenerateUniqueId();
+            _loadingService.StartLoading(newloadingId, "Stashing changes...");
             try
             {
                 var userProfile = await _userProfileService.GetCurrentUserProfileAsync();
@@ -2317,6 +2408,10 @@ public partial class MainWindow : Window
             {
                 AddErrorCard(ex.Message);
                 return;
+            }
+            finally
+            {
+                _loadingService.StopLoading(newloadingId);
             }
         };
         newWindow.Content = commonConfirmation;
@@ -2340,6 +2435,8 @@ public partial class MainWindow : Window
         commonConfirmation.OnConfirmClicked += async (o, e) =>
         {
             newWindow.Close();
+            var newloadingId = _loadingService.GenerateUniqueId();
+            _loadingService.StartLoading(newloadingId, "Popping stashed changes...");
             try
             {
                 await _gitRepositoryService.PopLastStashChangesAsync(CurrentRepository.Path);
@@ -2350,6 +2447,10 @@ public partial class MainWindow : Window
             {
                 AddErrorCard(ex.Message);
                 return;
+            }
+            finally
+            {
+                _loadingService.StopLoading(newloadingId);
             }
         };
         newWindow.Content = commonConfirmation;
@@ -2374,6 +2475,8 @@ public partial class MainWindow : Window
         commonConfirmation.OnConfirmClicked += async (o, e) =>
         {
             newWindow.Close();
+            var newloadingId = _loadingService.GenerateUniqueId();
+            _loadingService.StartLoading(newloadingId, "Aborting merge...");
             try
             {
                 await _gitRepositoryService.AbortMergeAsync(CurrentRepository.Path);
@@ -2384,8 +2487,14 @@ public partial class MainWindow : Window
             {
                 AddErrorCard(ex.Message);
             }
+            finally
+            {
+                _loadingService.StopLoading(newloadingId);
+            }
         };
         newWindow.Content = commonConfirmation;
         newWindow.Show(this);
     }
+
+
 }

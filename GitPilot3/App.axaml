@@ -385,6 +385,18 @@
             <Setter Property="CornerRadius" Value="6"/>
         </Style>
 
-        
+        <Style Selector= "Panel.LoadingIndicator">
+            <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+            <Style.Animations>
+                <Animation IterationCount="INFINITE" Duration="0:0:1" PlaybackDirection="Alternate">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="Background"  Value="White"/>
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="Background"  Value="{StaticResource BackgroundBrush}"/>
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
     </Application.Styles>
 </Application>

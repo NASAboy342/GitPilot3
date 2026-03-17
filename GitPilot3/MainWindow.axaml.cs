@@ -134,37 +134,30 @@ public partial class MainWindow : Window
         _loadingService.StartLoading(newLoadingId, "Syncing repository...");
         try
         {
-
-
             if (CurrentRepository == null || string.IsNullOrEmpty(CurrentRepository.Path))
                 throw new InvalidOperationException("No repository is currently loaded.");
 
             var localBranches = new List<GitBranch>();
             var remoteBranches = new List<GitBranch>();
-
             var tasks = new List<Task>()
             {
                 Task.Run(async () => {localBranches = await _gitRepositoryService.GetLocalBranchesAsync(CurrentRepository.Path);}),
                 Task.Run(async () => {remoteBranches = await _gitRepositoryService.GetRemoteBranchesAsync(CurrentRepository.Path);}),
                 Task.Run(async () => {CurrentRepository.Commits = await _gitRepositoryService.GetCommitsAsync(CurrentRepository.Path);}),
             };
-                await Task.WhenAll(tasks);
-
+            await Task.WhenAll(tasks);
                 tasks = new List<Task>()
             {
                 Task.Run(() => UpdateLocalBranches(localBranches)),
                 Task.Run(() => UpdateRemoteBranches(remoteBranches))
             };
             await Task.WhenAll(tasks);
-
             UpdateCurrentRepositoryDisplay();
-
             if (CurrentRepository.CommitDetail != null && !string.IsNullOrEmpty(CurrentRepository.CommitDetail.Commit.Sha))
             {
                 CurrentRepository.CommitDetail = await _gitRepositoryService.GetCommitDetailsAsync(CurrentRepository.Path, CurrentRepository.CommitDetail.Commit);
                 UpdateFileChangesView();
             }
-
             Task.Run(() => _appStageService.SaveCurrentRepository(CurrentRepository));
             _loadingService.StopLoading(newLoadingId);
         }
@@ -174,6 +167,11 @@ public partial class MainWindow : Window
             _errorMessageHandler.ShowErrorMessage("Failed to sync repository: " + ex.Message);
             return;
         }
+    }
+
+    private void Log(string message)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {message}");
     }
 
     private void UpdateRemoteBranches(List<GitBranch> remoteBranches)
@@ -1758,6 +1756,8 @@ public partial class MainWindow : Window
 
     private async Task OnRemoteBranchDoubleClicked(string remoteBranchName)
     {
+        var loadingId = _loadingService.GenerateUniqueId();
+        _loadingService.StartLoading(loadingId, $"Checking out branch {remoteBranchName}...");
         try
         {
             var currentUserProfile = await _userProfileService.GetCurrentUserProfileAsync();
@@ -1775,6 +1775,10 @@ public partial class MainWindow : Window
         {
             AddErrorCard(ex.Message);
             return;
+        }
+        finally
+        {
+            _loadingService.StopLoading(loadingId);
         }
     }
 

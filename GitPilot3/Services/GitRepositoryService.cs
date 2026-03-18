@@ -105,23 +105,22 @@ public class GitRepositoryService : IGitRepositoryService
     {
         using var libgitRepository = new Repository(repositoryPath);
         var commits = new List<GitCommit>();
-        var libgitCommits = libgitRepository.ObjectDatabase.Where(o => o is Commit).Cast<Commit>().OrderByDescending(c => c.Committer.When).Take(take).ToList();
-        AddIfHaveWorkInProgress(libgitRepository, commits);
-
-        // Cache branches to avoid multiple enumerations
-        var branches = libgitRepository.Branches.ToList();
-
-        // Pre-build a dictionary mapping commit SHA to branch name (for tip commits only)
-        var commitToBranchMap = branches
+        var libgitCommits = Task.Run( () => libgitRepository.ObjectDatabase
+            .Where(o => o is Commit)
+            .Cast<Commit>()
+            .OrderByDescending(c => c.Committer.When)
+            .Take(take).ToList());
+        var commitToBranchMap = Task.Run(() => libgitRepository.Branches
             .Where(b => b.Tip != null)
             .GroupBy(b => b.Tip.Sha)
-            .ToDictionary(g => g.Key, g => g.First().FriendlyName);
+            .ToDictionary(g => g.Key, g => g.First().FriendlyName));
 
-        // Use HashSet for O(1) deduplication
+        AddIfHaveWorkInProgress(libgitRepository, commits);
+
         var seenShas = new HashSet<string>();
         var commitList = new List<GitCommit>();
 
-        foreach (var libgitCommit in libgitCommits)
+        foreach (var libgitCommit in await libgitCommits)
         {
             if (seenShas.Add(libgitCommit.Sha))  // Add returns false if already exists
             {
@@ -132,7 +131,7 @@ public class GitRepositoryService : IGitRepositoryService
                     Description = libgitCommit.Message,
                     AuthorName = libgitCommit.Author.Name,
                     AuthorDate = libgitCommit.Author.When,
-                    BranchName = commitToBranchMap.TryGetValue(libgitCommit.Sha, out var branchName) ? branchName : "",
+                    BranchName =  (await commitToBranchMap).TryGetValue(libgitCommit.Sha, out var branchName) ? branchName : "",
                     ParentShas = libgitCommit.Parents.Select(p => p.Sha).ToList(),
                 });
             }

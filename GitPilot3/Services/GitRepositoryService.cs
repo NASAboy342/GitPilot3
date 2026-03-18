@@ -105,11 +105,11 @@ public class GitRepositoryService : IGitRepositoryService
     {
         using var libgitRepository = new Repository(repositoryPath);
         var commits = new List<GitCommit>();
-        var libgitCommits = Task.Run( () => libgitRepository.ObjectDatabase
-            .Where(o => o is Commit)
-            .Cast<Commit>()
-            .OrderByDescending(c => c.Committer.When)
-            .Take(take).ToList());
+        var libgitCommits = Task.Run(() => libgitRepository.Commits.QueryBy(new CommitFilter
+        {
+            SortBy = CommitSortStrategies.Time | CommitSortStrategies.Topological,
+            IncludeReachableFrom = libgitRepository.Refs
+        }).Take(take).ToList());
         var commitToBranchMap = Task.Run(() => libgitRepository.Branches
             .Where(b => b.Tip != null)
             .GroupBy(b => b.Tip.Sha)
@@ -131,13 +131,13 @@ public class GitRepositoryService : IGitRepositoryService
                     Description = libgitCommit.Message,
                     AuthorName = libgitCommit.Author.Name,
                     AuthorDate = libgitCommit.Author.When,
-                    BranchName =  (await commitToBranchMap).TryGetValue(libgitCommit.Sha, out var branchName) ? branchName : "",
+                    BranchName = (await commitToBranchMap).TryGetValue(libgitCommit.Sha, out var branchName) ? branchName : "",
                     ParentShas = libgitCommit.Parents.Select(p => p.Sha).ToList(),
                 });
             }
         }
 
-        commits.AddRange(commitList.OrderByDescending(c => c.AuthorDate));
+        commits.AddRange(commitList);
         return commits;
     }
 

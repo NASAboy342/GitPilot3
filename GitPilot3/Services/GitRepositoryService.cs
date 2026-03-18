@@ -101,44 +101,35 @@ public class GitRepositoryService : IGitRepositoryService
         Commands.Checkout(libgitRepository, branch);
     }
 
-    public async Task<List<GitCommit>> GetCommitsAsync(string repositoryPath, int loadedCommitCount = 0, int take = 100)
+    public Task<List<GitCommit>> GetCommitsAsync(string repositoryPath, int loadedCommitCount = 0, int take = 100)
     {
-        using var libgitRepository = new Repository(repositoryPath);
-        var commits = new List<GitCommit>();
-        var libgitCommits = Task.Run(() => libgitRepository.Commits.QueryBy(new CommitFilter
-        {
-            SortBy = CommitSortStrategies.Time | CommitSortStrategies.Topological,
-            IncludeReachableFrom = libgitRepository.Refs
-        }).Take(take).ToList());
-        var commitToBranchMap = Task.Run(() => libgitRepository.Branches
+        using var repo = new Repository(repositoryPath);
+
+        var commitToBranchMap = repo.Branches
             .Where(b => b.Tip != null)
             .GroupBy(b => b.Tip.Sha)
-            .ToDictionary(g => g.Key, g => g.First().FriendlyName));
+            .ToDictionary(g => g.Key, g => g.Select(b => b.FriendlyName).ToList());
 
-        AddIfHaveWorkInProgress(libgitRepository, commits);
-
-        var seenShas = new HashSet<string>();
-        var commitList = new List<GitCommit>();
-
-        foreach (var libgitCommit in await libgitCommits)
+        var commits = repo.Commits.QueryBy(new CommitFilter
         {
-            if (seenShas.Add(libgitCommit.Sha))  // Add returns false if already exists
-            {
-                commitList.Add(new GitCommit
-                {
-                    Sha = libgitCommit.Sha,
-                    Message = libgitCommit.MessageShort,
-                    Description = libgitCommit.Message,
-                    AuthorName = libgitCommit.Author.Name,
-                    AuthorDate = libgitCommit.Author.When,
-                    BranchName = (await commitToBranchMap).TryGetValue(libgitCommit.Sha, out var branchName) ? branchName : "",
-                    ParentShas = libgitCommit.Parents.Select(p => p.Sha).ToList(),
-                });
-            }
-        }
+            SortBy = CommitSortStrategies.Time | CommitSortStrategies.Topological,
+            IncludeReachableFrom = repo.Refs
+        })
+        .Skip(loadedCommitCount)
+        .Take(take)
+        .Select(c => new GitCommit
+        {
+            Sha = c.Sha,
+            Message = c.MessageShort,
+            Description = c.Message,
+            AuthorName = c.Author.Name,
+            AuthorDate = c.Author.When,
+            BranchName = (commitToBranchMap.TryGetValue(c.Sha, out var names) ? names : new List<string>()).FirstOrDefault() ?? "",
+            ParentShas = c.Parents.Select(p => p.Sha).ToList(),
+        })
+        .ToList();
 
-        commits.AddRange(commitList);
-        return commits;
+        return Task.FromResult(commits);
     }
 
     private void AddIfHaveWorkInProgress(Repository libgitRepository, List<GitCommit> commits)

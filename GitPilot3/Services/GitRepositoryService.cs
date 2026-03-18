@@ -103,8 +103,9 @@ public class GitRepositoryService : IGitRepositoryService
 
     public async Task<List<GitCommit>> GetCommitsAsync(string repositoryPath, int loadedCommitCount = 0, int take = 100)
     {
-        var libgitRepository = new Repository(repositoryPath);
+        using var libgitRepository = new Repository(repositoryPath);
         var commits = new List<GitCommit>();
+        var libgitCommits = libgitRepository.ObjectDatabase.Where(o => o is Commit).Cast<Commit>().OrderByDescending(c => c.Committer.When).Take(take).ToList();
         AddIfHaveWorkInProgress(libgitRepository, commits);
 
         // Cache branches to avoid multiple enumerations
@@ -119,39 +120,22 @@ public class GitRepositoryService : IGitRepositoryService
         // Use HashSet for O(1) deduplication
         var seenShas = new HashSet<string>();
         var commitList = new List<GitCommit>();
-        var isReachedLimit = false;
-        var skippedCount = 0;
 
-        foreach (var branch in branches)
+        foreach (var libgitCommit in libgitCommits)
         {
-            foreach (var commit in branch.Commits)
+            if (seenShas.Add(libgitCommit.Sha))  // Add returns false if already exists
             {
-                if (skippedCount < loadedCommitCount)
+                commitList.Add(new GitCommit
                 {
-                    skippedCount++;
-                    continue;
-                }
-                if (commitList.Count >= take)
-                {
-                    isReachedLimit = true;
-                    break;
-                }
-                if (seenShas.Add(commit.Sha))  // Add returns false if already exists
-                {
-                    commitList.Add(new GitCommit
-                    {
-                        Sha = commit.Sha,
-                        Message = commit.MessageShort,
-                        Description = commit.Message,
-                        AuthorName = commit.Author.Name,
-                        AuthorDate = commit.Author.When,
-                        BranchName = commitToBranchMap.TryGetValue(commit.Sha, out var branchName) ? branchName : "",
-                        ParentShas = commit.Parents.Select(p => p.Sha).ToList(),
-                    });
-                }
+                    Sha = libgitCommit.Sha,
+                    Message = libgitCommit.MessageShort,
+                    Description = libgitCommit.Message,
+                    AuthorName = libgitCommit.Author.Name,
+                    AuthorDate = libgitCommit.Author.When,
+                    BranchName = commitToBranchMap.TryGetValue(libgitCommit.Sha, out var branchName) ? branchName : "",
+                    ParentShas = libgitCommit.Parents.Select(p => p.Sha).ToList(),
+                });
             }
-            if (isReachedLimit)
-                break;
         }
 
         commits.AddRange(commitList.OrderByDescending(c => c.AuthorDate));

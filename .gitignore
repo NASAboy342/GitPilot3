@@ -5,3 +5,4 @@ GitPilot3/obj/rider.project.restore.info
 .DS_Store
 .vs/
 Release/MacOs/dmg-temp/GitPilot3.app/
+*.dmg

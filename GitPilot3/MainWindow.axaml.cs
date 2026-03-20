@@ -146,7 +146,7 @@ public partial class MainWindow : Window
                 Task.Run(async () => {CurrentRepository.Commits = await _gitRepositoryService.GetCommitsAsync(CurrentRepository.Path);}),
             };
             await Task.WhenAll(tasks);
-                tasks = new List<Task>()
+            tasks = new List<Task>()
             {
                 Task.Run(() => UpdateLocalBranches(localBranches)),
                 Task.Run(() => UpdateRemoteBranches(remoteBranches))

@@ -110,7 +110,9 @@ public class GitRepositoryService : IGitRepositoryService
             .GroupBy(b => b.Tip.Sha)
             .ToDictionary(g => g.Key, g => g.Select(b => b.FriendlyName).ToList());
 
-        var commits = repo.Commits.QueryBy(new CommitFilter
+        var commits = new List<GitCommit>();
+        AddIfHaveWorkInProgress(repo, commits);
+        commits.AddRange(repo.Commits.QueryBy(new CommitFilter
         {
             SortBy = CommitSortStrategies.Time | CommitSortStrategies.Topological,
             IncludeReachableFrom = repo.Refs
@@ -127,8 +129,7 @@ public class GitRepositoryService : IGitRepositoryService
             BranchName = (commitToBranchMap.TryGetValue(c.Sha, out var names) ? names : new List<string>()).FirstOrDefault() ?? "",
             ParentShas = c.Parents.Select(p => p.Sha).ToList(),
         })
-        .ToList();
-
+        .ToList());
         return Task.FromResult(commits);
     }
 
@@ -154,10 +155,19 @@ public class GitRepositoryService : IGitRepositoryService
 
     public async Task<GitCommitDetail> GetCommitDetailsAsync(string path, GitCommit commit)
     {
-        if (commit.IsWorkInProgress)
-            return GetWIPDetails(path, commit);
-        else
-            return GetCommitDetailsFromGit(path, commit);
+        var loadingId = _loadingService.GenerateUniqueId();
+        _loadingService.StartLoading(loadingId, "Loading commit details...");
+        try
+        {
+            if (commit.IsWorkInProgress)
+                return GetWIPDetails(path, commit);
+            else
+                return GetCommitDetailsFromGit(path, commit);
+        }
+        finally
+        {
+            _loadingService.StopLoading(loadingId);
+        }
     }
 
     private GitCommitDetail GetCommitDetailsFromGit(string path, GitCommit commit)
@@ -166,7 +176,7 @@ public class GitRepositoryService : IGitRepositoryService
         var libgitCommit = libgitRepository.Lookup<LibGit2Sharp.Commit>(commit.Sha);
         if (libgitCommit == null)
             return new GitCommitDetail();
-
+    
         var commitDetail = new GitCommitDetail();
         commitDetail.Commit = commit;
 
@@ -194,7 +204,7 @@ public class GitRepositoryService : IGitRepositoryService
         return commitDetail;
     }
 
-    private static GitCommitDetail GetWIPDetails(string path, GitCommit commit)
+    private GitCommitDetail GetWIPDetails(string path, GitCommit commit)
     {
         var libgitRepository = new Repository(path);
         var commitDetail = new GitCommitDetail();

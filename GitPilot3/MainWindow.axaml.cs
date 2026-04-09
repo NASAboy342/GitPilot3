@@ -63,7 +63,6 @@ public partial class MainWindow : Window
         SetupWindow();
         _errorMessageHandler.ErrorMessageShown += (s, e) => AddErrorCard(e);
         _errorMessageHandler.SuccessMessageShown += (s, e) => AddSuccessCard(e);
-        InitializeGitWatcher();
     }
 
     private void SetActionOnLoadingChange()

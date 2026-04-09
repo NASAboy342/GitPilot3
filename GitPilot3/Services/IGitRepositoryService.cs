@@ -11,7 +11,7 @@ public interface IGitRepositoryService
     Task<GitRepository> LoadRepositoryAsync(string? repositoryPath);
     Task<List<GitBranch>> GetLocalBranchesAsync(string? repositoryPath);
     Task CheckoutBranchAsync(GitRepository currentRepository, string name);
-    Task<List<GitCommit>> GetCommitsAsync(string repositoryPath);
+    Task<List<GitCommit>> GetCommitsAsync(string repositoryPath, int loadedCommitCount = 0, int take = 100);
     Task<GitCommitDetail> GetCommitDetailsAsync(string path, GitCommit commit);
     Task StageFilesAsync(string path, List<string> unstageFilePaths);
     Task UnStageFilesAsync(string path, List<string> list);

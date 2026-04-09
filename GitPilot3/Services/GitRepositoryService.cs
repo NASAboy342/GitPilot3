@@ -11,6 +11,11 @@ namespace GitPilot3.Services;
 
 public class GitRepositoryService : IGitRepositoryService
 {
+    private readonly ILoadingService _loadingService;
+    public GitRepositoryService(ILoadingService loadingService)
+    {
+        _loadingService = loadingService;
+    }
     public async Task<List<GitBranch>> GetRemoteBranchesAsync(string? repositoryPath)
     {
         var libgitRepository = new Repository(repositoryPath);
@@ -58,6 +63,11 @@ public class GitRepositoryService : IGitRepositoryService
         return localBranches;
     }
 
+    private void Log(string message)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {message}");
+    }
+
     public async Task<GitRepository> LoadRepositoryAsync(string? repositoryPath)
     {
         if (string.IsNullOrEmpty(repositoryPath))
@@ -91,25 +101,36 @@ public class GitRepositoryService : IGitRepositoryService
         Commands.Checkout(libgitRepository, branch);
     }
 
-    public async Task<List<GitCommit>> GetCommitsAsync(string repositoryPath)
+    public Task<List<GitCommit>> GetCommitsAsync(string repositoryPath, int loadedCommitCount = 0, int take = 100)
     {
-        var libgitRepository = new Repository(repositoryPath);
+        using var repo = new Repository(repositoryPath);
+
+        var commitToBranchMap = repo.Branches
+            .Where(b => b.Tip != null)
+            .GroupBy(b => b.Tip.Sha)
+            .ToDictionary(g => g.Key, g => g.Select(b => b.FriendlyName).ToList());
+
         var commits = new List<GitCommit>();
-        AddIfHaveWorkInProgress(libgitRepository, commits);
-        commits.AddRange(libgitRepository.Branches
-            .SelectMany(b => b.Commits.Take(50))
-            .DistinctBy(c => c.Sha)
-            .Select(c => new GitCommit
-            {
-                Sha = c.Sha,
-                Message = c.MessageShort,
-                Description = c.Message,
-                AuthorName = c.Author.Name,
-                AuthorDate = c.Author.When,
-                BranchName = libgitRepository.Branches.FirstOrDefault(b => b.Tip.Sha == c.Sha)?.FriendlyName ?? "",
-                ParentShas = c.Parents.Select(p => p.Sha).ToList(),
-            }).OrderByDescending(c => c.AuthorDate).ToList());
-        return commits;
+        AddIfHaveWorkInProgress(repo, commits);
+        commits.AddRange(repo.Commits.QueryBy(new CommitFilter
+        {
+            SortBy = CommitSortStrategies.Time | CommitSortStrategies.Topological,
+            IncludeReachableFrom = repo.Refs
+        })
+        .Skip(loadedCommitCount)
+        .Take(take)
+        .Select(c => new GitCommit
+        {
+            Sha = c.Sha,
+            Message = c.MessageShort,
+            Description = c.Message,
+            AuthorName = c.Author.Name,
+            AuthorDate = c.Author.When,
+            BranchName = (commitToBranchMap.TryGetValue(c.Sha, out var names) ? names : new List<string>()).FirstOrDefault() ?? "",
+            ParentShas = c.Parents.Select(p => p.Sha).ToList(),
+        })
+        .ToList());
+        return Task.FromResult(commits);
     }
 
     private void AddIfHaveWorkInProgress(Repository libgitRepository, List<GitCommit> commits)
@@ -134,10 +155,19 @@ public class GitRepositoryService : IGitRepositoryService
 
     public async Task<GitCommitDetail> GetCommitDetailsAsync(string path, GitCommit commit)
     {
-        if (commit.IsWorkInProgress)
-            return GetWIPDetails(path, commit);
-        else
-            return GetCommitDetailsFromGit(path, commit);
+        var loadingId = _loadingService.GenerateUniqueId();
+        _loadingService.StartLoading(loadingId, "Loading commit details...");
+        try
+        {
+            if (commit.IsWorkInProgress)
+                return GetWIPDetails(path, commit);
+            else
+                return GetCommitDetailsFromGit(path, commit);
+        }
+        finally
+        {
+            _loadingService.StopLoading(loadingId);
+        }
     }
 
     private GitCommitDetail GetCommitDetailsFromGit(string path, GitCommit commit)
@@ -146,7 +176,7 @@ public class GitRepositoryService : IGitRepositoryService
         var libgitCommit = libgitRepository.Lookup<LibGit2Sharp.Commit>(commit.Sha);
         if (libgitCommit == null)
             return new GitCommitDetail();
-
+    
         var commitDetail = new GitCommitDetail();
         commitDetail.Commit = commit;
 
@@ -174,7 +204,7 @@ public class GitRepositoryService : IGitRepositoryService
         return commitDetail;
     }
 
-    private static GitCommitDetail GetWIPDetails(string path, GitCommit commit)
+    private GitCommitDetail GetWIPDetails(string path, GitCommit commit)
     {
         var libgitRepository = new Repository(path);
         var commitDetail = new GitCommitDetail();
@@ -312,47 +342,75 @@ public class GitRepositoryService : IGitRepositoryService
         return commitRequest;
     }
 
-    public Task CommitAsync(string path, GitRepository currentRepository, CommitRequest commitRequest)
+    public async Task CommitAsync(string path, GitRepository currentRepository, CommitRequest commitRequest)
     {
-        var libgitRepository = new Repository(path);
-        var author = new Signature(commitRequest.Author, commitRequest.Email, DateTimeOffset.Now);
-        var message = commitRequest.Message + "\n\n" + commitRequest.Description;
+        var loadingId = _loadingService.GenerateUniqueId();
+        _loadingService.StartLoading(loadingId, "Committing changes...");
+        try
+        {
+            var libgitRepository = new Repository(path);
+            var author = new Signature(commitRequest.Author, commitRequest.Email, DateTimeOffset.Now);
+            var message = commitRequest.Message + "\n\n" + commitRequest.Description;
 
-        Commit commit = libgitRepository.Commit(message, author, author);
-        return Task.CompletedTask;
+            await Task.Run(() => libgitRepository.Commit(message, author, author));
+        }
+        finally
+        {
+            _loadingService.StopLoading(loadingId);
+        }
     }
 
     public async Task PushAsync(string path, GitRepository currentRepository, UserProfile userProfile)
     {
-        var libgitRepository = new Repository(path);
-        var currentBranch = currentRepository.LocalBranches.FirstOrDefault(b => b.IsCurrent);
-        if (currentBranch == null){
-            throw new InvalidOperationException("No current branch found to push.");
-        }
-
-        var options = new PushOptions
+        var loadingId = _loadingService.GenerateUniqueId();
+        _loadingService.StartLoading(loadingId, "Pushing changes to remote repository...");
+        try
         {
-            CredentialsProvider = (_url, _user, _cred) =>
-                new UsernamePasswordCredentials
-                {
-                    Username = userProfile.Username,
-                    Password = userProfile.Password
-                }
-        };
-        libgitRepository.Network.Push(libgitRepository.Branches[currentBranch.Name], options);
+            var libgitRepository = new Repository(path);
+            var currentBranch = currentRepository.LocalBranches.FirstOrDefault(b => b.IsCurrent);
+            if (currentBranch == null)
+            {
+                throw new InvalidOperationException("No current branch found to push.");
+            }
+
+            var options = new PushOptions
+            {
+                CredentialsProvider = (_url, _user, _cred) =>
+                    new UsernamePasswordCredentials
+                    {
+                        Username = userProfile.Username,
+                        Password = userProfile.Password
+                    }
+            };
+            await Task.Run(() => libgitRepository.Network.Push(libgitRepository.Branches[currentBranch.Name], options));
+        }
+        finally
+        {
+            _loadingService.StopLoading(loadingId);
+        }
     }
 
     public async Task FetchAsync(string path, UserProfile currentUserProfile)
     {
-        var libgitRepository = new Repository(path);
-        Commands.Fetch(libgitRepository, libgitRepository.Network.Remotes.First().Name, new string[0], new FetchOptions{
-            CredentialsProvider = (_url, _user, _cred) =>
-                new UsernamePasswordCredentials
-                {
-                    Username = currentUserProfile.Username,
-                    Password = currentUserProfile.Password
-                }
-        }, null);
+        var loadingId = _loadingService.GenerateUniqueId();
+        _loadingService.StartLoading(loadingId, "Fetching changes from remote repository...");
+        try
+        {
+            var libgitRepository = new Repository(path);
+            await Task.Run(() => Commands.Fetch(libgitRepository, libgitRepository.Network.Remotes.First().Name, new string[0], new FetchOptions
+            {
+                CredentialsProvider = (_url, _user, _cred) =>
+                    new UsernamePasswordCredentials
+                    {
+                        Username = currentUserProfile.Username,
+                        Password = currentUserProfile.Password
+                    }
+            }, null));
+        }
+        finally
+        {
+            _loadingService.StopLoading(loadingId);
+        }
     }
 
     public async Task PullAsync(UserProfile currentUserProfile, GitRepository currentRepository)
@@ -394,7 +452,8 @@ public class GitRepositoryService : IGitRepositoryService
     {
         var libgitRepository = new Repository(path);
         var currentBranch = currentRepository.LocalBranches.FirstOrDefault(b => b.IsCurrent);
-        if (currentBranch == null){
+        if (currentBranch == null)
+        {
             throw new InvalidOperationException("No current branch found to publish.");
         }
 
@@ -468,7 +527,7 @@ public class GitRepositoryService : IGitRepositoryService
 
     public void ValidateGitRepositoryUrl(string url)
     {
-        if (string.IsNullOrEmpty(url) || 
+        if (string.IsNullOrEmpty(url) ||
             !(url.StartsWith("http://") || url.StartsWith("https://") || url.StartsWith("git@") || url.StartsWith("ssh://")))
         {
             throw new ArgumentException("Invalid Git repository URL.");
@@ -478,7 +537,7 @@ public class GitRepositoryService : IGitRepositoryService
     public async Task DiscardFilesAsync(string path, List<string> unstageFilePaths)
     {
         var libgitRepository = new Repository(path);
-        libgitRepository.CheckoutPaths(libgitRepository.Head.FriendlyName, unstageFilePaths, new CheckoutOptions{ CheckoutModifiers = CheckoutModifiers.Force });
+        libgitRepository.CheckoutPaths(libgitRepository.Head.FriendlyName, unstageFilePaths, new CheckoutOptions { CheckoutModifiers = CheckoutModifiers.Force });
     }
 
     public async Task StashChangesAsync(string path, UserProfile userProfile)

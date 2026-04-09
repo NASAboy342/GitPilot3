@@ -41,6 +41,7 @@ class Program
         services.AddSingleton<IAppStageService, AppStageService>();
         services.AddSingleton<ErrorMessageHandler, ErrorMessageHandler>();
         services.AddSingleton<IGraphComponentService, GraphComponentService>();
+        services.AddSingleton<ILoadingService, LoadingService>();
 
         services.AddTransient<MainWindow>();
         services.AddTransient<ProfileManagementWindow>();

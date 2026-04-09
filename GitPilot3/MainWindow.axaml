@@ -280,9 +280,13 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="10,0">
-                        <TextBlock Classes="SuccessText" Text="Ready" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="ApplicationStatusText" Classes="SuccessText" Text="Ready" VerticalAlignment="Center" IsVisible="True"/>
+                        <Panel x:Name="LoadingIndicatorPanel" Classes="LoadingIndicator" IsVisible="False" Width="200" Margin="10,0,0,0"/>
                         <TextBlock Classes="TextMuted" Text=" • " VerticalAlignment="Center"/>
                         <TextBlock x:Name="BranchCurrentTextBlock" Classes="BranchCurrent" Text="" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="3">
+                        <TextBlock x:Name="AppVersionTextBlock">v1.0.5</TextBlock>
                     </StackPanel>
                 </Grid>
             </Border>

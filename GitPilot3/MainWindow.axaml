@@ -285,6 +285,9 @@
                         <TextBlock Classes="TextMuted" Text=" • " VerticalAlignment="Center"/>
                         <TextBlock x:Name="BranchCurrentTextBlock" Classes="BranchCurrent" Text="" VerticalAlignment="Center"/>
                     </StackPanel>
+                    <StackPanel Grid.Column="3">
+                        <TextBlock x:Name="AppVersionTextBlock">v1.0.5</TextBlock>
+                    </StackPanel>
                 </Grid>
             </Border>
         </Grid>

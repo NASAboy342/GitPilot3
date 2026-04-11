@@ -986,8 +986,20 @@ public partial class MainWindow : Window
 
     private async Task ShowCommitDetails(GitCommit commit)
     {
-        CurrentRepository.CommitDetail = await _gitRepositoryService.GetCommitDetailsAsync(CurrentRepository.Path, commit);
-        UpdateFileChangesView();
+        var newLoadingId = _loadingService.GenerateUniqueId();
+        _loadingService.StartLoading(newLoadingId, "Loading commit details...");
+        try
+        {
+            var startTime = DateTime.Now;
+            CurrentRepository.CommitDetail = await _gitRepositoryService.GetCommitDetailsAsync(CurrentRepository.Path, commit);
+            Log($"Time taken to load commit details: {(DateTime.Now - startTime).TotalMilliseconds} milliseconds");
+            UpdateFileChangesView();
+            Log($"Time taken to update file changes view: {(DateTime.Now - startTime).TotalMilliseconds} milliseconds");
+        }
+        finally
+        {
+            _loadingService.StopLoading(newLoadingId);
+        }
     }
 
     private void UpdateFileChangesView()
@@ -1385,14 +1397,21 @@ public partial class MainWindow : Window
         var gitDiffLines = fileChange.DiffContent.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).ToList();
         try
         {
-            var repositoryPath = CurrentRepository.Path.Replace("/.git/", "").Replace("\\.git\\", "");
-            var filePath = gitDiffLines.FirstOrDefault()?.Split(' ').FirstOrDefault(l => l.StartsWith("b/"))?.Substring(2) ?? "";
-            var path = System.IO.Path.Combine(repositoryPath, filePath);
-            var changeContents = GetChangeContentFromGitDiff(gitDiffLines);
-            var fileContentLines = FileHelper.ReadFromFile(path);
-            var resultFiltContentLines = CombindFileContentWithChangeContent(fileContentLines, changeContents);
-            DrawChangesIndicatorsNearScrollBar(resultFiltContentLines, changeContents);
-            return resultFiltContentLines;
+            if (fileChange.IsSupportedFileType)
+            {
+                var repositoryPath = CurrentRepository.Path.Replace("/.git/", "").Replace("\\.git\\", "");
+                var filePath = gitDiffLines.FirstOrDefault()?.Split(' ').FirstOrDefault(l => l.StartsWith("b/"))?.Substring(2) ?? "";
+                var path = System.IO.Path.Combine(repositoryPath, filePath);
+                var changeContents = GetChangeContentFromGitDiff(gitDiffLines);
+                var fileContentLines = FileHelper.ReadFromFile(path);
+                var resultFiltContentLines = CombindFileContentWithChangeContent(fileContentLines, changeContents);
+                DrawChangesIndicatorsNearScrollBar(resultFiltContentLines, changeContents);
+                return resultFiltContentLines;
+            }
+            else
+            {
+                return new List<string> { "File type is not supported to show diff content." };
+            }
         }
         catch (Exception ex)
         {

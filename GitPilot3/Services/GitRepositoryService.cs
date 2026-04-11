@@ -195,15 +195,29 @@ public class GitRepositoryService : IGitRepositoryService
                 fileChange.Deletions = patchEntry?.LinesDeleted ?? 0;
                 fileChange.DiffContent = patchEntry?.Patch ?? "";
                 fileChange.IsStaged = true;
+                fileChange.IsSupportedFileType = IsSupportedFileType(change.Path);
 
                 var blob = libgitCommit.Tree[change.Path]?.Target.Id;
-                fileChange.FileContent = blob != null ? libgitRepository.Lookup<LibGit2Sharp.Blob>(blob)?.GetContentText() : "";
+                if (fileChange.IsSupportedFileType)
+                {
+                    fileChange.FileContent = blob != null ? libgitRepository.Lookup<LibGit2Sharp.Blob>(blob)?.GetContentText() : "";
+                }
+                else
+                {
+                    fileChange.FileContent = "Binary file content not supported.";
+                }
                 commitDetail.FilesChanged.Add(fileChange);
             }
         }
         return commitDetail;
     }
 
+    private bool IsSupportedFileType(string path)
+    {
+        var unsupportedExtensions = new[] { ".exe", ".dll", ".bin", ".jpg", ".jpeg", ".png", ".ico", ".gif", ".bmp", ".pdf", ".zip", ".tar", ".gz", ".gguf", ".ggml" };
+        var extension = System.IO.Path.GetExtension(path);
+        return !unsupportedExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase);
+    }
     private GitCommitDetail GetWIPDetails(string path, GitCommit commit)
     {
         var libgitRepository = new Repository(path);
@@ -215,7 +229,7 @@ public class GitRepositoryService : IGitRepositoryService
         return commitDetail;
     }
 
-    private static void AppendStagedChanges(Repository libgitRepository, GitCommitDetail commitDetail)
+    private void AppendStagedChanges(Repository libgitRepository, GitCommitDetail commitDetail)
     {
         var status = libgitRepository.RetrieveStatus();
         var changes = libgitRepository.Diff.Compare<TreeChanges>(libgitRepository.Head.Tip.Tree, DiffTargets.Index);
@@ -241,16 +255,24 @@ public class GitRepositoryService : IGitRepositoryService
                 fileChange.DiffContent = patchEntry?.Patch ?? "";
                 fileChange.IsStaged = true;
                 fileChange.IsConflicted = entry.State.HasFlag(FileStatus.Conflicted);
+                fileChange.IsSupportedFileType = IsSupportedFileType(entry.FilePath);
 
                 var blob = libgitRepository.Index[entry.FilePath]?.Id;
-                fileChange.FileContent = blob != null ? libgitRepository.Lookup<Blob>(blob)?.GetContentText() : "";
+                if (fileChange.IsSupportedFileType)
+                {
+                    fileChange.FileContent = blob != null ? libgitRepository.Lookup<Blob>(blob)?.GetContentText() : "";
+                }
+                else
+                {
+                    fileChange.FileContent = "Binary file content not supported.";
+                }
 
                 commitDetail.FilesChanged.Add(fileChange);
             }
         }
     }
 
-    private static void AppendUnstagedChanges(Repository libgitRepository, GitCommitDetail commitDetail)
+    private void AppendUnstagedChanges(Repository libgitRepository, GitCommitDetail commitDetail)
     {
         var status = libgitRepository.RetrieveStatus();
         var changes = libgitRepository.Diff.Compare<TreeChanges>(libgitRepository.Head.Tip.Tree, DiffTargets.WorkingDirectory);
@@ -274,9 +296,17 @@ public class GitRepositoryService : IGitRepositoryService
                 fileChange.Deletions = patchEntry?.LinesDeleted ?? 0;
                 fileChange.DiffContent = patchEntry?.Patch ?? "";
                 fileChange.IsStaged = false;
+                fileChange.IsSupportedFileType = IsSupportedFileType(entry.FilePath);
 
                 var blob = libgitRepository.Head.Tip.Tree[entry.FilePath]?.Target.Id;
-                fileChange.FileContent = blob != null ? libgitRepository.Lookup<LibGit2Sharp.Blob>(blob)?.GetContentText() : "";
+                if (fileChange.IsSupportedFileType)
+                {
+                    fileChange.FileContent = blob != null ? libgitRepository.Lookup<LibGit2Sharp.Blob>(blob)?.GetContentText() : "";
+                }
+                else
+                {
+                    fileChange.FileContent = "Binary file content not supported.";
+                }
 
                 commitDetail.FilesChanged.Add(fileChange);
             }

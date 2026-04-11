@@ -6,3 +6,4 @@ GitPilot3/obj/rider.project.restore.info
 .vs/
 Release/MacOs/dmg-temp/GitPilot3.app/
 *.dmg
+Release/Windows/GitPilot3Setup.exe

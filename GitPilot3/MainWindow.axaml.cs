@@ -22,6 +22,7 @@ using Avalonia.Platform;
 using GitPilot3.Helpers;
 using Avalonia.Controls.Primitives;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace GitPilot3;
 
@@ -36,6 +37,8 @@ public partial class MainWindow : Window
     private readonly IAppStageService _appStageService;
     private readonly ErrorMessageHandler _errorMessageHandler;
     private FileSystemWatcher? _fileSystemWatcher;
+    private CancellationTokenSource? _watcherDebounceCts;
+    private readonly SemaphoreSlim _repositorySyncLock = new(1, 1);
     private IGraphComponentService _graphComponentService;
     private EventHandler OnRepositoryOpenedSuccessfully;
     private ILoadingService _loadingService;
@@ -63,6 +66,7 @@ public partial class MainWindow : Window
         SetupWindow();
         _errorMessageHandler.ErrorMessageShown += (s, e) => AddErrorCard(e);
         _errorMessageHandler.SuccessMessageShown += (s, e) => AddSuccessCard(e);
+        Closed += (_, _) => DisposeWatcherResources();
     }
 
     private void SetActionOnLoadingChange()
@@ -91,26 +95,45 @@ public partial class MainWindow : Window
         {
             if (String.IsNullOrEmpty(CurrentRepository.Path))
                 return;
-            if (!CurrentRepository.IsAutoRefreshDisabled)
+            if (CurrentRepository.IsAutoRefreshDisabled)
+            {
+                DisposeWatcherResources();
                 return;
+            }
+
+            var gitMetadataPath = System.IO.Path.Combine(CurrentRepository.Path, ".git");
+            var watchPath = Directory.Exists(gitMetadataPath) ? gitMetadataPath : CurrentRepository.Path;
+
             _fileSystemWatcher?.Dispose();
             _fileSystemWatcher = new FileSystemWatcher
             {
-                Path = CurrentRepository.Path,
-                NotifyFilter = NotifyFilters.LastWrite,
+                Path = watchPath,
+                IncludeSubdirectories = true,
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName,
                 EnableRaisingEvents = true
             };
-            _fileSystemWatcher.Changed += async (s, e) =>
-            {
-                await Dispatcher.UIThread.InvokeAsync(async () => await OnRepositoryChanged());
-            };
+            _fileSystemWatcher.Changed += OnGitWatcherEvent;
+            _fileSystemWatcher.Created += OnGitWatcherEvent;
+            _fileSystemWatcher.Deleted += OnGitWatcherEvent;
+            _fileSystemWatcher.Renamed += OnGitWatcherRenamedEvent;
         }
         catch (Exception ex)
         {
             AddErrorCard("Failed to initialize Git watcher: " + ex.Message);
         }
     }
-    private async Task OnRepositoryChanged()
+
+    private void OnGitWatcherEvent(object sender, FileSystemEventArgs e)
+    {
+        _ = ScheduleRepositoryRefresh();
+    }
+
+    private void OnGitWatcherRenamedEvent(object sender, RenamedEventArgs e)
+    {
+        _ = ScheduleRepositoryRefresh();
+    }
+
+    private async Task ScheduleRepositoryRefresh()
     {
         try
         {
@@ -118,12 +141,54 @@ public partial class MainWindow : Window
             {
                 return;
             }
-            await Task.Delay(TimeSpan.FromSeconds(5));
-            await SyncRepository();
+
+            _watcherDebounceCts?.Cancel();
+            _watcherDebounceCts?.Dispose();
+            _watcherDebounceCts = new CancellationTokenSource();
+            var token = _watcherDebounceCts.Token;
+
+            // Debounce noisy filesystem events to avoid repeated full syncs.
+            await Task.Delay(TimeSpan.FromMilliseconds(1200), token);
+
+            if (!await _repositorySyncLock.WaitAsync(0, token))
+            {
+                return;
+            }
+
+            try
+            {
+                await Dispatcher.UIThread.InvokeAsync(async () => await SyncRepository());
+            }
+            finally
+            {
+                _repositorySyncLock.Release();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer file event superseded this scheduled refresh.
         }
         catch (Exception ex)
         {
             _errorMessageHandler.ShowErrorMessage("Failed to refresh repository: " + ex.Message);
+        }
+    }
+
+    private void DisposeWatcherResources()
+    {
+        _watcherDebounceCts?.Cancel();
+        _watcherDebounceCts?.Dispose();
+        _watcherDebounceCts = null;
+
+        if (_fileSystemWatcher != null)
+        {
+            _fileSystemWatcher.EnableRaisingEvents = false;
+            _fileSystemWatcher.Changed -= OnGitWatcherEvent;
+            _fileSystemWatcher.Created -= OnGitWatcherEvent;
+            _fileSystemWatcher.Deleted -= OnGitWatcherEvent;
+            _fileSystemWatcher.Renamed -= OnGitWatcherRenamedEvent;
+            _fileSystemWatcher.Dispose();
+            _fileSystemWatcher = null;
         }
     }
 

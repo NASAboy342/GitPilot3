@@ -387,6 +387,9 @@
 
         <Style Selector= "Panel.LoadingIndicator">
             <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+        </Style>
+
+        <Style Selector= "Panel.LoadingIndicator[IsVisible=true]">
             <Style.Animations>
                 <Animation IterationCount="INFINITE" Duration="0:0:1" PlaybackDirection="Alternate">
                     <KeyFrame Cue="0%">
